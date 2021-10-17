@@ -57,9 +57,10 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id):
+  def __init__(self, gapps, simulation_id, Ybus):
     self.gapps = gapps
     self.simulation_id = simulation_id
+    self.Ybus = Ybus
     self.keepLoopingFlag = True
 
 
@@ -82,6 +83,18 @@ class SimWrapper(object):
       msgdict = message['message']
       ts = msgdict['timestamp']
       print('simulation timestamp: ' + str(ts), flush=True)
+
+      # Ybus processing workflow:
+      # 1. Iterate over all measurement mrids
+      # 2. Stop on any that are switch state or regulator tap position changes
+      # 3. Determine the node associated with the mrid
+      # 4. Iterate over all Ybus entries for the row of the node, updating values
+      #    off-diagonals directly and diagonal terms by the square
+      # 5. For tap changes, the value multiplier for off-diagonal entries is the
+      #    tap position ratio and for diagonal entries it is the square of the ratio
+      # 6. For switch changes, a closed switch should restore the starting Ybus
+      #    values and an open switch should set them to (-500,500)
+      # 7. Publish updated Ybus after all measurement mrids are processed
 
 
 def ybus_export(gapps, feeder_mrid):
@@ -122,7 +135,7 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
     Ybus[nodes[int(items[0])]][nodes[int(items[1])]] = Ybus[nodes[int(items[1])]][nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
   print(Ybus)
 
-  simRap = SimWrapper(gapps, simulation_id)
+  simRap = SimWrapper(gapps, simulation_id, Ybus)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
