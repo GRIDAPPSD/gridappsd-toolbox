@@ -50,6 +50,7 @@ import argparse
 import json
 import importlib
 import math
+import pprint
 import numpy as np
 
 from gridappsd import GridAPPSD
@@ -97,11 +98,36 @@ class SimWrapper(object):
       # 7. Publish updated Ybus after all measurement mrids are processed
 
 
+def cim_export(gapps, simulation_id):
+    message = {
+      "configurationType":"CIM Dictionary",
+      "parameters": {
+        "simulation_id": simulation_id }
+    };
+
+    results = gapps.get_response('goss.gridappsd.process.request.config', message, timeout=1200)
+
+    phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
+
+    MridToNode = {}
+    for feeders in results['data']['feeders']:
+        for meas in feeders['measurements']:
+            # Pos measurement type includes both switches and regulators
+            if meas['measurementType'] == 'Pos':
+                node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
+                MridToNode[meas['mRID']] = node.upper()
+                print('Type: ' + meas['measurementType'] + ', mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
+
+    pprint.pprint(MridToNode)
+
+    return MridToNode
+
+
 def ybus_export(gapps, feeder_mrid):
   message = {
-  "configurationType": "YBus Export",
-  "parameters": {
-    "model_id": feeder_mrid}
+    "configurationType": "YBus Export",
+    "parameters": {
+      "model_id": feeder_mrid}
   }
 
   results = gapps.get_response("goss.gridappsd.process.request.config", message, timeout=1200)
@@ -111,7 +137,7 @@ def ybus_export(gapps, feeder_mrid):
   for obj in results['data']['nodeList']:
     nodes[idx] = obj.strip('\"')
     idx += 1
-  print(nodes)
+  pprint.pprint(nodes)
 
   Ybus = {}
   for obj in results['data']['yParse']:
@@ -123,7 +149,7 @@ def ybus_export(gapps, feeder_mrid):
     if nodes[int(items[1])] not in Ybus:
       Ybus[nodes[int(items[1])]] = {}
     Ybus[nodes[int(items[0])]][nodes[int(items[1])]] = Ybus[nodes[int(items[1])]][nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
-  print(Ybus)
+  pprint.pprint(Ybus)
 
   return nodes,Ybus
 
@@ -133,6 +159,8 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
   logfile = log_file
 
   gapps = GridAPPSD()
+
+  MridToNode = cim_export(gapps, simulation_id)
 
   nodes,Ybus = ybus_export(gapps, feeder_mrid)
 
