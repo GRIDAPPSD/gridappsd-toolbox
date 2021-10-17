@@ -53,7 +53,7 @@ import math
 import numpy as np
 
 from gridappsd import GridAPPSD
-from gridappsd.topics import simulation_output_topic
+from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
@@ -72,9 +72,16 @@ class SimWrapper(object):
         if not self.keepLoopingFlag:
             return
 
-        msgdict = message['message']
-        ts = msgdict['timestamp']
-        print('simulation timestamp: ' + str(ts), flush=True)
+        if 'message' in message:
+            msgdict = message['message']
+            ts = msgdict['timestamp']
+            print('simulation timestamp: ' + str(ts), flush=True)
+
+        elif 'processStatus' in message:
+            status = message['processStatus']
+            if status=='COMPLETE' or status=='CLOSED':
+                print('simulation FINISHED!', flush=True)
+                self.keepLoopingFlag = False
 
 
 def ybus_export(gapps, feeder_mrid):
@@ -114,13 +121,19 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
     print(Ybus)
 
     simRap = SimWrapper(gapps, simulation_id)
-    conn_id = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
+    conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
+    conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
+
+    print('Starting simulation monitoring loop....', flush=True)
 
     while simRap.keepLooping():
         #print('Sleeping....', flush=True)
         time.sleep(0.1)
 
-    gapps.unsubscribe(conn_id)
+    print('Done simulation monitoring loop', flush=True)
+
+    gapps.unsubscribe(conn_id1)
+    gapps.unsubscribe(conn_id2)
 
     return
 
