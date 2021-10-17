@@ -117,7 +117,9 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
             continue
         if nodes[int(items[0])] not in Ybus:
             Ybus[nodes[int(items[0])]] = {}
-        Ybus[nodes[int(items[0])]][nodes[int(items[1])]] = complex(float(items[2]), float(items[3]))
+        if nodes[int(items[1])] not in Ybus:
+            Ybus[nodes[int(items[1])]] = {}
+        Ybus[nodes[int(items[0])]][nodes[int(items[1])]] = Ybus[nodes[int(items[1])]][nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
     print(Ybus)
 
     simRap = SimWrapper(gapps, simulation_id)
