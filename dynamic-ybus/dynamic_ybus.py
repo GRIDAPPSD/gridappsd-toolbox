@@ -58,9 +58,11 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus):
+  def __init__(self, gapps, simulation_id, SwitchMridToNode, RegulatorMridToNode, Ybus):
     self.gapps = gapps
     self.simulation_id = simulation_id
+    self.SwitchMridToNode = SwitchMridToNode
+    self.RegulatorMridToNode = RegulatorMridToNode
     self.Ybus = Ybus
     self.keepLoopingFlag = True
 
@@ -97,30 +99,56 @@ class SimWrapper(object):
       #    values and an open switch should set them to (-500,500)
       # 7. Publish updated Ybus after all measurement mrids are processed
 
+      for mrid in msgdict['measurements']:
+        if 'value' in msgdict['measurements'][mrid]:
+          #pprint.pprint(msgdict['measurements'][mrid])
+          if mrid in self.SwitchMridToNode:
+            value = msgdict['measurements'][mrid]['value']
+            print('Switch mrid: ' + mrid + ', node: ' + self.SwitchMridToNode[mrid] + ', value: ' + str(value), flush=True)
+          elif mrid in self.RegulatorMridToNode:
+            value = msgdict['measurements'][mrid]['value']
+            print('Regulator mrid: ' + mrid + ', node: ' + self.RegulatorMridToNode[mrid] + ', value: ' + str(value), flush=True)
+
+      # Start Friday:
+      # Since every switch state and tap position is part of every measurement,
+      # I need to compare the last state to the current one to determine when to
+      # update Ybus
+
 
 def cim_export(gapps, simulation_id):
     message = {
       "configurationType":"CIM Dictionary",
       "parameters": {
         "simulation_id": simulation_id }
-    };
+    }
 
     results = gapps.get_response('goss.gridappsd.process.request.config', message, timeout=1200)
 
     phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
 
-    MridToNode = {}
+    SwitchMridToNode = {}
+    RegulatorMridToNode = {}
     for feeders in results['data']['feeders']:
         for meas in feeders['measurements']:
             # Pos measurement type includes both switches and regulators
             if meas['measurementType'] == 'Pos':
-                node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
-                MridToNode[meas['mRID']] = node.upper()
-                print('Type: ' + meas['measurementType'] + ', mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
+                if meas['ConductingEquipment_type'] == 'LoadBreakSwitch':
+                  node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
+                  SwitchMridToNode[meas['mRID']] = node.upper()
+                  print('Switch mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
+                elif meas['ConductingEquipment_type'] == 'PowerTransformer':
+                  node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
+                  RegulatorMridToNode[meas['mRID']] = node.upper()
+                  print('Regulator mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
+                # TODO: do we need to handle LinearShuntCompensator?
+                #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
 
-    pprint.pprint(MridToNode)
+    print('Switches:', flush=True)
+    pprint.pprint(SwitchMridToNode)
+    print('Regulators:', flush=True)
+    pprint.pprint(RegulatorMridToNode)
 
-    return MridToNode
+    return SwitchMridToNode,RegulatorMridToNode
 
 
 def ybus_export(gapps, feeder_mrid):
@@ -133,25 +161,25 @@ def ybus_export(gapps, feeder_mrid):
   results = gapps.get_response("goss.gridappsd.process.request.config", message, timeout=1200)
 
   idx = 1
-  nodes = {}
+  Nodes = {}
   for obj in results['data']['nodeList']:
-    nodes[idx] = obj.strip('\"')
+    Nodes[idx] = obj.strip('\"')
     idx += 1
-  pprint.pprint(nodes)
+  pprint.pprint(Nodes)
 
   Ybus = {}
   for obj in results['data']['yParse']:
     items = obj.split(',')
     if items[0] == 'Row':
       continue
-    if nodes[int(items[0])] not in Ybus:
-      Ybus[nodes[int(items[0])]] = {}
-    if nodes[int(items[1])] not in Ybus:
-      Ybus[nodes[int(items[1])]] = {}
-    Ybus[nodes[int(items[0])]][nodes[int(items[1])]] = Ybus[nodes[int(items[1])]][nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
+    if Nodes[int(items[0])] not in Ybus:
+      Ybus[Nodes[int(items[0])]] = {}
+    if Nodes[int(items[1])] not in Ybus:
+      Ybus[Nodes[int(items[1])]] = {}
+    Ybus[Nodes[int(items[0])]][Nodes[int(items[1])]] = Ybus[Nodes[int(items[1])]][Nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
   pprint.pprint(Ybus)
 
-  return nodes,Ybus
+  return Nodes,Ybus
 
 
 def start(log_file, feeder_mrid, model_api_topic, simulation_id):
@@ -160,11 +188,11 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
   gapps = GridAPPSD()
 
-  MridToNode = cim_export(gapps, simulation_id)
+  SwitchMridToNode,RegulatorMridToNode = cim_export(gapps, simulation_id)
 
-  nodes,Ybus = ybus_export(gapps, feeder_mrid)
+  Nodes,Ybus = ybus_export(gapps, feeder_mrid)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus)
+  simRap = SimWrapper(gapps, simulation_id, SwitchMridToNode, RegulatorMridToNode, Ybus)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
