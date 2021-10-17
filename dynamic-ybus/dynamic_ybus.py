@@ -57,105 +57,105 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-    def __init__(self, gapps, simulation_id):
-        self.gapps = gapps
-        self.simulation_id = simulation_id
-        self.keepLoopingFlag = True
+  def __init__(self, gapps, simulation_id):
+    self.gapps = gapps
+    self.simulation_id = simulation_id
+    self.keepLoopingFlag = True
 
 
-    def keepLooping(self):
-        return self.keepLoopingFlag
+  def keepLooping(self):
+    return self.keepLoopingFlag
 
 
-    def on_message(self, header, message):
-        # TODO workaround for broken unsubscribe method
-        if not self.keepLoopingFlag:
-            return
+  def on_message(self, header, message):
+    # TODO workaround for broken unsubscribe method
+    if not self.keepLoopingFlag:
+      return
 
-        if 'message' in message:
-            msgdict = message['message']
-            ts = msgdict['timestamp']
-            print('simulation timestamp: ' + str(ts), flush=True)
+    if 'processStatus' in message:
+      status = message['processStatus']
+      if status=='COMPLETE' or status=='CLOSED':
+        print('simulation FINISHED!', flush=True)
+        self.keepLoopingFlag = False
 
-        elif 'processStatus' in message:
-            status = message['processStatus']
-            if status=='COMPLETE' or status=='CLOSED':
-                print('simulation FINISHED!', flush=True)
-                self.keepLoopingFlag = False
+    else:
+      msgdict = message['message']
+      ts = msgdict['timestamp']
+      print('simulation timestamp: ' + str(ts), flush=True)
 
 
 def ybus_export(gapps, feeder_mrid):
-    message = {
-    "configurationType": "YBus Export",
-    "parameters": {
-        "model_id": feeder_mrid}
-    }
+  message = {
+  "configurationType": "YBus Export",
+  "parameters": {
+    "model_id": feeder_mrid}
+  }
 
-    results = gapps.get_response("goss.gridappsd.process.request.config", message, timeout=1200)
-    return results['data']['yParse'],results['data']['nodeList']
+  results = gapps.get_response("goss.gridappsd.process.request.config", message, timeout=1200)
+  return results['data']['yParse'],results['data']['nodeList']
 
 
 def start(log_file, feeder_mrid, model_api_topic, simulation_id):
-    global logfile
-    logfile = log_file
+  global logfile
+  logfile = log_file
 
-    gapps = GridAPPSD()
+  gapps = GridAPPSD()
 
-    ysparse,nodelist = ybus_export(gapps, feeder_mrid)
+  ysparse,nodelist = ybus_export(gapps, feeder_mrid)
 
-    idx = 1
-    nodes = {}
-    for obj in nodelist:
-        nodes[idx] = obj.strip('\"')
-        idx += 1
-    print(nodes)
+  idx = 1
+  nodes = {}
+  for obj in nodelist:
+    nodes[idx] = obj.strip('\"')
+    idx += 1
+  print(nodes)
 
-    Ybus = {}
-    for obj in ysparse:
-        items = obj.split(',')
-        if items[0] == 'Row':
-            continue
-        if nodes[int(items[0])] not in Ybus:
-            Ybus[nodes[int(items[0])]] = {}
-        if nodes[int(items[1])] not in Ybus:
-            Ybus[nodes[int(items[1])]] = {}
-        Ybus[nodes[int(items[0])]][nodes[int(items[1])]] = Ybus[nodes[int(items[1])]][nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
-    print(Ybus)
+  Ybus = {}
+  for obj in ysparse:
+    items = obj.split(',')
+    if items[0] == 'Row':
+      continue
+    if nodes[int(items[0])] not in Ybus:
+      Ybus[nodes[int(items[0])]] = {}
+    if nodes[int(items[1])] not in Ybus:
+      Ybus[nodes[int(items[1])]] = {}
+    Ybus[nodes[int(items[0])]][nodes[int(items[1])]] = Ybus[nodes[int(items[1])]][nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
+  print(Ybus)
 
-    simRap = SimWrapper(gapps, simulation_id)
-    conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
-    conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
+  simRap = SimWrapper(gapps, simulation_id)
+  conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
+  conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
-    print('Starting simulation monitoring loop....', flush=True)
+  print('Starting simulation monitoring loop....', flush=True)
 
-    while simRap.keepLooping():
-        #print('Sleeping....', flush=True)
-        time.sleep(0.1)
+  while simRap.keepLooping():
+    #print('Sleeping....', flush=True)
+    time.sleep(0.1)
 
-    print('Done simulation monitoring loop', flush=True)
+  print('Done simulation monitoring loop', flush=True)
 
-    gapps.unsubscribe(conn_id1)
-    gapps.unsubscribe(conn_id2)
+  gapps.unsubscribe(conn_id1)
+  gapps.unsubscribe(conn_id2)
 
-    return
+  return
 
 
 def _main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--request", help="Simulation Request")
-    parser.add_argument("--simid", help="Simulation ID")
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--request", help="Simulation Request")
+  parser.add_argument("--simid", help="Simulation ID")
 
-    opts = parser.parse_args()
-    sim_request = json.loads(opts.request.replace("\'",""))
-    feeder_mrid = sim_request["power_system_config"]["Line_name"]
-    simulation_id = opts.simid
+  opts = parser.parse_args()
+  sim_request = json.loads(opts.request.replace("\'",""))
+  feeder_mrid = sim_request["power_system_config"]["Line_name"]
+  simulation_id = opts.simid
 
-    model_api_topic = "goss.gridappsd.process.request.data.powergridmodel"
-    log_file = open('dynamic_ybus.log', 'w')
+  model_api_topic = "goss.gridappsd.process.request.data.powergridmodel"
+  log_file = open('dynamic_ybus.log', 'w')
 
-    start(log_file, feeder_mrid, model_api_topic, simulation_id)
+  start(log_file, feeder_mrid, model_api_topic, simulation_id)
 
 
 if __name__ == "__main__":
-    _main()
+  _main()
 
