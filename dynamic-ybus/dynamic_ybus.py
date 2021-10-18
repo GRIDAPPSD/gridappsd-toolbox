@@ -58,11 +58,11 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, SwitchMridToNode, RegulatorMridToNode, Ybus):
+  def __init__(self, gapps, simulation_id, SwitchMridToNode, TransformerMridToNode, Ybus):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.SwitchMridToNode = SwitchMridToNode
-    self.RegulatorMridToNode = RegulatorMridToNode
+    self.TransformerMridToNode = TransformerMridToNode
     self.Ybus = Ybus
     self.keepLoopingFlag = True
 
@@ -88,26 +88,34 @@ class SimWrapper(object):
       print('simulation timestamp: ' + str(ts), flush=True)
 
       # Ybus processing workflow:
-      # 1. Iterate over all measurement mrids
-      # 2. Stop on any that are switch state or regulator tap position changes
-      # 3. Determine the node associated with the mrid
-      # 4. Iterate over all Ybus entries for the row of the node, updating values
-      #    off-diagonals directly and diagonal terms by the square
-      # 5. For tap changes, the value multiplier for off-diagonal entries is the
-      #    tap position ratio and for diagonal entries it is the square of the ratio
+      # 1. Iterate over all switch and transformer mrids
+      # 2. Determine if the measurement value has changed since the last measurement.
+      #    If so:
+      # 3. Set a flag to indicate that a new Ybus message will be published
+      # 4. Iterate over all Ybus entries for the row of the node for the
+      #    mrid, updating values
+      # 5. For tap changes, the value multiplier for entries is the
+      #    tap position ratio.  Come back and apply the multiplier a 2nd time for
+      #    the diagonal entry so it is squared
       # 6. For switch changes, a closed switch should restore the starting Ybus
       #    values and an open switch should set them to (-500,500)
-      # 7. Publish updated Ybus after all measurement mrids are processed
+      # 7. After all switch and transformer mrids are processed, if the change flag
+      #    is set, publish updated Ybus sending separate messages for the full Ybus
+      #    (maybe just lower diagonal) and just for changed elements
 
-      for mrid in msgdict['measurements']:
+      for mrid in self.SwitchMridToNode:
         if 'value' in msgdict['measurements'][mrid]:
-          #pprint.pprint(msgdict['measurements'][mrid])
-          if mrid in self.SwitchMridToNode:
-            value = msgdict['measurements'][mrid]['value']
-            print('Switch mrid: ' + mrid + ', node: ' + self.SwitchMridToNode[mrid] + ', value: ' + str(value), flush=True)
-          elif mrid in self.RegulatorMridToNode:
-            value = msgdict['measurements'][mrid]['value']
-            print('Regulator mrid: ' + mrid + ', node: ' + self.RegulatorMridToNode[mrid] + ', value: ' + str(value), flush=True)
+          value = msgdict['measurements'][mrid]['value']
+          print('Found switch mrid: ' + mrid + ', node: ' + self.SwitchMridToNode[mrid] + ', value: ' + str(value), flush=True)
+        else:
+          print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+
+      for mrid in self.TransformerMridToNode:
+        if 'value' in msgdict['measurements'][mrid]:
+          value = msgdict['measurements'][mrid]['value']
+          print('Found transformer mrid: ' + mrid + ', node: ' + self.TransformerMridToNode[mrid] + ', value: ' + str(value), flush=True)
+        else:
+          print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
       # Start Friday:
       # Since every switch state and tap position is part of every measurement,
@@ -127,7 +135,7 @@ def cim_export(gapps, simulation_id):
     phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
 
     SwitchMridToNode = {}
-    RegulatorMridToNode = {}
+    TransformerMridToNode = {}
     for feeders in results['data']['feeders']:
         for meas in feeders['measurements']:
             # Pos measurement type includes both switches and regulators
@@ -138,17 +146,17 @@ def cim_export(gapps, simulation_id):
                   print('Switch mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
                 elif meas['ConductingEquipment_type'] == 'PowerTransformer':
                   node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
-                  RegulatorMridToNode[meas['mRID']] = node.upper()
-                  print('Regulator mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
+                  TransformerMridToNode[meas['mRID']] = node.upper()
+                  print('Transformer mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
                 # TODO: do we need to handle LinearShuntCompensator?
                 #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
 
     print('Switches:', flush=True)
     pprint.pprint(SwitchMridToNode)
-    print('Regulators:', flush=True)
-    pprint.pprint(RegulatorMridToNode)
+    print('Transformers:', flush=True)
+    pprint.pprint(TransformerMridToNode)
 
-    return SwitchMridToNode,RegulatorMridToNode
+    return SwitchMridToNode,TransformerMridToNode
 
 
 def ybus_export(gapps, feeder_mrid):
@@ -188,11 +196,11 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
   gapps = GridAPPSD()
 
-  SwitchMridToNode,RegulatorMridToNode = cim_export(gapps, simulation_id)
+  SwitchMridToNode,TransformerMridToNode = cim_export(gapps, simulation_id)
 
   Nodes,Ybus = ybus_export(gapps, feeder_mrid)
 
-  simRap = SimWrapper(gapps, simulation_id, SwitchMridToNode, RegulatorMridToNode, Ybus)
+  simRap = SimWrapper(gapps, simulation_id, SwitchMridToNode, TransformerMridToNode, Ybus)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
