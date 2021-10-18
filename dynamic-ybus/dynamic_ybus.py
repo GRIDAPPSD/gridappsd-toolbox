@@ -106,6 +106,24 @@ class SimWrapper(object):
       #    is set, publish updated Ybus sending separate messages for the full Ybus
       #    (maybe just lower diagonal) and just for changed elements
 
+      # Questions:
+      # 1. Do I need to process changes to LinearShuntCompensator conducting
+      #    equipment?
+      # 2. Should I keep track of and publish the full Ybus or just the lower
+      #    diagonal elements (same for YbusChanges)?
+      # 3. Do we need to keep/publish an index number based version of Ybus vs.
+      #    just the node name based version?
+      # 4. Should the ActiveMQ message format for Ybus just be the "sparse"
+      #    dictionary of dictionaries?
+      # 5. Should the real and imaginary components of complex Ybus values be
+      #    given as two separate floating point values in the published message
+      #    instead of some complex number representation?
+      # 6. Need verification of what I'm updating in Ybus and if the values I'm
+      #    updating to are correct for switches and transformers
+      # 7. Aren't I missing at least updates to impacted nodes from switch state
+      #    changes by only processing the Ybus row and not using Topology Processor
+      #    for keeping track of what nodes are controlled by a switch?
+
       changedFlag = False
       YbusChanges = {}
 
