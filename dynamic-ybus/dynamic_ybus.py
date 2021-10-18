@@ -58,12 +58,14 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, SwitchMridToNode, TransformerMridToNode):
+  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.Ybus = Ybus
+    self.YbusOrig = YbusOrig
     self.SwitchMridToNode = SwitchMridToNode
     self.TransformerMridToNode = TransformerMridToNode
+    self.LastValue = {}
     self.keepLoopingFlag = True
 
 
@@ -103,19 +105,46 @@ class SimWrapper(object):
       #    is set, publish updated Ybus sending separate messages for the full Ybus
       #    (maybe just lower diagonal) and just for changed elements
 
+      changedFlag = False
+
       for mrid in self.SwitchMridToNode:
         if 'value' in msgdict['measurements'][mrid]:
           value = msgdict['measurements'][mrid]['value']
-          print('Found switch mrid: ' + mrid + ', node: ' + self.SwitchMridToNode[mrid] + ', value: ' + str(value), flush=True)
+          node = self.SwitchMridToNode[mrid]
+          print('Found switch mrid: ' + mrid + ', node: ' + node + ', value: ' + str(value), flush=True)
+          if node not in self.LastValue:
+            # just set last value to the current value and call it good
+            self.LastValue[node] = value
+          elif value != self.LastValue[node]:
+            changedFlag = True
+            print('Switch value changed for node: ' + node + ', old value: ' + str(self.LastValue[node]) + ', new value: ' + str(value), flush=True)
+          #else:
+          #  print('Switch value NOT changed for node: ' + node + ', old value: ' + str(self.LastValue[node]) + ', new value: ' + str(value), flush=True)
+
         else:
           print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
       for mrid in self.TransformerMridToNode:
         if 'value' in msgdict['measurements'][mrid]:
           value = msgdict['measurements'][mrid]['value']
-          print('Found transformer mrid: ' + mrid + ', node: ' + self.TransformerMridToNode[mrid] + ', value: ' + str(value), flush=True)
+          node = self.TransformerMridToNode[mrid]
+          print('Found transformer mrid: ' + mrid + ', node: ' + node + ', value: ' + str(value), flush=True)
+          if node not in self.LastValue:
+            # just set last value to the current value and call it good
+            self.LastValue[node] = value
+          elif value != self.LastValue[node]:
+            changedFlag = True
+            print('Transformer value changed for node: ' + node + ', old value: ' + str(self.LastValue[node]) + ', new value: ' + str(value), flush=True)
+          #else:
+          #  print('Transformer value NOT changed for node: ' + node + ', old value: ' + str(self.LastValue[node]) + ', new value: ' + str(value), flush=True)
+
         else:
           print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+
+      if changedFlag:
+        print('changedFlag set so I will publish updated Ybus', flush=True)
+      else:
+        print('changedFlag NOT set so nothing to do', flush=True)
 
       # Start Friday:
       # Since every switch state and tap position is part of every measurement,
@@ -233,7 +262,7 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
   # will never change)
   YbusOrig = ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus, SwitchMridToNode, TransformerMridToNode)
+  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
