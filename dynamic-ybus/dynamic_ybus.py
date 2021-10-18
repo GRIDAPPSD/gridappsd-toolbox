@@ -66,6 +66,7 @@ class SimWrapper(object):
     self.SwitchMridToNode = SwitchMridToNode
     self.TransformerMridToNode = TransformerMridToNode
     self.LastValue = {}
+    self.OrigTapPos = {}
     self.keepLoopingFlag = True
 
 
@@ -140,12 +141,26 @@ class SimWrapper(object):
           noderow = self.TransformerMridToNode[mrid]
           print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
           if noderow not in self.LastValue:
-            # just set last value to the current value and call it good
-            self.LastValue[noderow] = value
+            # set last value to the current value and save the original tap position
+            # to determine the admittance multiplier
+            self.LastValue[noderow] = self.OrigTapPos[noderow] = value
           elif value != self.LastValue[noderow]:
             changedFlag = True
             print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
             self.LastValue[noderow] = value # update last value with current value
+
+            # calculate the admittance multiplier based on the change in the tap
+            # position vs. the original position
+            tapPosMultiplier = 1.0 + (value - self.OrigTapPos[noderow])*0.0625
+
+            # update Ybus based on the multiplier
+            for nodecol in Ybus[noderow]:
+              Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = \
+                                       YbusOrig[noderow][nodecol] * tapPosMultiplier
+
+            # for the diagonal element square the multiplier for YbusOrig
+            Ybus[noderow][noderow] = YbusOrig[noderow][noderow] * tapPosMultiplier**2
+
           #else:
           #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
 
@@ -156,11 +171,6 @@ class SimWrapper(object):
         print('changedFlag set so I will publish updated Ybus', flush=True)
       else:
         print('changedFlag NOT set so nothing to do', flush=True)
-
-      # Start Friday:
-      # Since every switch state and tap position is part of every measurement,
-      # I need to compare the last state to the current one to determine when to
-      # update Ybus
 
 
 def cim_export(gapps, simulation_id):
