@@ -122,7 +122,13 @@ class SimWrapper(object):
       #    updating to are correct for switches and transformers
       # 7. Aren't I missing at least updates to impacted nodes from switch state
       #    changes by only processing the Ybus row and not using Topology Processor
-      #    for keeping track of what nodes are controlled by a switch?
+      #    for keeping track of what nodes are controlled by a switch?  Doesn't
+      #    just updating the same Ybus row only get the direct connections to
+      #    the switch node where it could deenergize much beyond that?
+      # 8. Is my approach of initializing the switch states and tap positions based
+      #    on the first simulation output message legitimate or do I really need
+      #    another way to do this?  For switches, I assume this would be that all
+      #    switches start closed, but not sure on regulator tap positions.
 
       changedFlag = False
       YbusChanges = {}
