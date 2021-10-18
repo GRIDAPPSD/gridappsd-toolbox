@@ -107,6 +107,7 @@ class SimWrapper(object):
       #    (maybe just lower diagonal) and just for changed elements
 
       changedFlag = False
+      YbusChanges = {}
 
       for mrid in self.SwitchMridToNode:
         if 'value' in msgdict['measurements'][mrid]:
@@ -121,13 +122,20 @@ class SimWrapper(object):
             print('Switch value changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
             self.LastValue[noderow] = value # update last value with current value
 
+            if noderow not in YbusChanges:
+              YbusChanges[noderow] = {}
+              YbusChanges[nodecol] = {}
+
             # check whether the switch is now open or closed and update accordingly
             if value == 0: # now open, hardwire admittance
               for nodecol in Ybus[noderow]:
                 Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = complex(-500.0, 500.0)
+                YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = complex(-500.0, 500.0)
+
             else: # now closed, restore admittance to original value
               for nodecol in Ybus[noderow]:
                 Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = YbusOrig[noderow][nodecol]
+                YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = YbusOrig[noderow][nodecol]
 
           #else:
           #  print('Switch value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
@@ -149,6 +157,10 @@ class SimWrapper(object):
             print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
             self.LastValue[noderow] = value # update last value with current value
 
+            if noderow not in YbusChanges:
+              YbusChanges[noderow] = {}
+              YbusChanges[nodecol] = {}
+
             # calculate the admittance multiplier based on the change in the tap
             # position vs. the original position
             tapPosMultiplier = 1.0 + (value - self.OrigTapPos[noderow])*0.0625
@@ -157,9 +169,12 @@ class SimWrapper(object):
             for nodecol in Ybus[noderow]:
               Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = \
                                        YbusOrig[noderow][nodecol] * tapPosMultiplier
+              YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = \
+                                       YbusOrig[noderow][nodecol] * tapPosMultiplier
 
             # for the diagonal element square the multiplier for YbusOrig
             Ybus[noderow][noderow] = YbusOrig[noderow][noderow] * tapPosMultiplier**2
+            YbusChanges[noderow][noderow] = YbusOrig[noderow][noderow] * tapPosMultiplier**2
 
           #else:
           #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
@@ -168,7 +183,7 @@ class SimWrapper(object):
           print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
       if changedFlag:
-        print('changedFlag set so I will publish updated Ybus', flush=True)
+        print('changedFlag set so I will publish full Ybus and minimal YbusChanges', flush=True)
       else:
         print('changedFlag NOT set so nothing to do', flush=True)
 
