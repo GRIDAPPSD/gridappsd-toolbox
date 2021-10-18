@@ -110,16 +110,26 @@ class SimWrapper(object):
       for mrid in self.SwitchMridToNode:
         if 'value' in msgdict['measurements'][mrid]:
           value = msgdict['measurements'][mrid]['value']
-          node = self.SwitchMridToNode[mrid]
-          print('Found switch mrid: ' + mrid + ', node: ' + node + ', value: ' + str(value), flush=True)
-          if node not in self.LastValue:
+          noderow = self.SwitchMridToNode[mrid]
+          print('Found switch mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+          if noderow not in self.LastValue:
             # just set last value to the current value and call it good
-            self.LastValue[node] = value
-          elif value != self.LastValue[node]:
+            self.LastValue[noderow] = value
+          elif value != self.LastValue[noderow]:
             changedFlag = True
-            print('Switch value changed for node: ' + node + ', old value: ' + str(self.LastValue[node]) + ', new value: ' + str(value), flush=True)
+            print('Switch value changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
+            self.LastValue[noderow] = value # update last value with current value
+
+            # check whether the switch is now open or closed and update accordingly
+            if value == 0: # now open, hardwire admittance
+              for nodecol in Ybus[noderow]:
+                Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = complex(-500.0, 500.0)
+            else: # now closed, restore admittance to original value
+              for nodecol in Ybus[noderow]:
+                Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = YbusOrig[noderow][nodecol]
+
           #else:
-          #  print('Switch value NOT changed for node: ' + node + ', old value: ' + str(self.LastValue[node]) + ', new value: ' + str(value), flush=True)
+          #  print('Switch value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
 
         else:
           print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
@@ -127,16 +137,17 @@ class SimWrapper(object):
       for mrid in self.TransformerMridToNode:
         if 'value' in msgdict['measurements'][mrid]:
           value = msgdict['measurements'][mrid]['value']
-          node = self.TransformerMridToNode[mrid]
-          print('Found transformer mrid: ' + mrid + ', node: ' + node + ', value: ' + str(value), flush=True)
-          if node not in self.LastValue:
+          noderow = self.TransformerMridToNode[mrid]
+          print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+          if noderow not in self.LastValue:
             # just set last value to the current value and call it good
-            self.LastValue[node] = value
-          elif value != self.LastValue[node]:
+            self.LastValue[noderow] = value
+          elif value != self.LastValue[noderow]:
             changedFlag = True
-            print('Transformer value changed for node: ' + node + ', old value: ' + str(self.LastValue[node]) + ', new value: ' + str(value), flush=True)
+            print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
+            self.LastValue[noderow] = value # update last value with current value
           #else:
-          #  print('Transformer value NOT changed for node: ' + node + ', old value: ' + str(self.LastValue[node]) + ', new value: ' + str(value), flush=True)
+          #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
 
         else:
           print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
@@ -227,20 +238,18 @@ def ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode):
       YbusOrig[noderow] = {}
 
     for nodecol,value in Ybus[noderow].items():
-      if nodecol not in YbusOrig:
-        YbusOrig[nodecol] = {}
-
-      YbusOrig[noderow][nodecol] = YbusOrig[nodecol][noderow] = value
+      # could store the value with row and col reversed as well, but don't
+      # currently need it
+      YbusOrig[noderow][nodecol] = value
 
   for noderow in TransformerMridToNode.values():
     if noderow not in YbusOrig:
       YbusOrig[noderow] = {}
 
     for nodecol,value in Ybus[noderow].items():
-      if nodecol not in YbusOrig:
-        YbusOrig[nodecol] = {}
-
-      YbusOrig[noderow][nodecol] = YbusOrig[nodecol][noderow] = value
+      # could store the value with row and col reversed as well, but don't
+      # currently need it
+      YbusOrig[noderow][nodecol] = value
 
   #pprint.pprint(YbusOrig)
 
