@@ -58,12 +58,12 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, SwitchMridToNode, TransformerMridToNode, Ybus):
+  def __init__(self, gapps, simulation_id, Ybus, SwitchMridToNode, TransformerMridToNode):
     self.gapps = gapps
     self.simulation_id = simulation_id
+    self.Ybus = Ybus
     self.SwitchMridToNode = SwitchMridToNode
     self.TransformerMridToNode = TransformerMridToNode
-    self.Ybus = Ybus
     self.keepLoopingFlag = True
 
 
@@ -190,6 +190,34 @@ def ybus_export(gapps, feeder_mrid):
   return Nodes,Ybus
 
 
+def ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode):
+  YbusOrig = {}
+
+  for noderow in SwitchMridToNode.values():
+    if noderow not in YbusOrig:
+      YbusOrig[noderow] = {}
+
+    for nodecol,value in Ybus[noderow].items():
+      if nodecol not in YbusOrig:
+        YbusOrig[nodecol] = {}
+
+      YbusOrig[noderow][nodecol] = YbusOrig[nodecol][noderow] = value
+
+  for noderow in TransformerMridToNode.values():
+    if noderow not in YbusOrig:
+      YbusOrig[noderow] = {}
+
+    for nodecol,value in Ybus[noderow].items():
+      if nodecol not in YbusOrig:
+        YbusOrig[nodecol] = {}
+
+      YbusOrig[noderow][nodecol] = YbusOrig[nodecol][noderow] = value
+
+  #pprint.pprint(YbusOrig)
+
+  return YbusOrig
+
+
 def start(log_file, feeder_mrid, model_api_topic, simulation_id):
   global logfile
   logfile = log_file
@@ -200,7 +228,12 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
   Nodes,Ybus = ybus_export(gapps, feeder_mrid)
 
-  simRap = SimWrapper(gapps, simulation_id, SwitchMridToNode, TransformerMridToNode, Ybus)
+  # Save the starting Ybus values for all the entries that could change based
+  # on switch and transformer value changes (no reason to save the values that
+  # will never change)
+  YbusOrig = ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode)
+
+  simRap = SimWrapper(gapps, simulation_id, Ybus, SwitchMridToNode, TransformerMridToNode)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
