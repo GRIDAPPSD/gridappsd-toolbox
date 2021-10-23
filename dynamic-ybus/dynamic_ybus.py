@@ -146,17 +146,46 @@ class SimWrapper(object):
       #    Poorva thinks it would be better to use the alarm service than determining
       #    changes from simulation output.  She said that the new switch state is
       #    part of the alarm message and that if tap position wasn't already, it could
-      #    be easily added.
+      #    be easily added.  Andy thinks that being this reliant on the alarm service
+      #    though isn't justified for this tool and we should stick with using
+      #    simulation output.
+      #
+      #    From Dec 13 meeting with Andy, he advised using the intial Y-bus that's
+      #    determined from the Model Validator CIM Y-bus code to use as the basis
+      #    for initial values for both switches and tap positions.  For switches at
+      #    least, this seems doable.  I can look at the Y-bus value to determine if
+      #    the switch starts out open or closed based on the value.  Then I can
+      #    continue to do this instead of keeping a "last value" dictionary to
+      #    determine when I need to update Y-bus values.  Andy suggested if the values
+      #    indicate a closed switch, but says it's -1000 instead of -500, that I
+      #    update it to be -1000.  This would only be at the start though and maybe
+      #    never if I use the MV CIM code.  I'm still not sure how this would work
+      #    with regulator tap positions so code it for switches first to figure out
+      #    the implications for tap positions and whether I need to ask some questions.
+      #
+      #    Other Andy guidance:
+      #    * Use try/catch instead of checking 'value' in measurement.  Also, it's
+      #      not guaranteed that the mrid will exist either and this will catch that
+      #    * My LastValue logic will go away and I can hopefully always use the same
+      #      logic to determine changes both the first time through and after that.
+      #      Andy did figure out we'd need a last tap position though so this is not
+      #      the same for regulators.
+      #    * Get this working first for a monolithic Y-bus and then later come back
+      #      to consider a separate Y-bus per feeder and island.  This version might
+      #      need to be topology processor aware.
 
       changedFlag = False
       YbusChanges = {}
 
+      switchOpenValue = complex(0,0)
+      switchClosedValue = complex(-500,500)
+
       for mrid in self.SwitchMridToNode:
-        if 'value' in msgdict['measurements'][mrid]:
+        if 'value' in msgdict['measurements'][mrid]: # NOTE: use try/catch instead
           value = msgdict['measurements'][mrid]['value']
           noderow = self.SwitchMridToNode[mrid]
           print('Found switch mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
-          if noderow not in self.LastValue:
+          if noderow not in self.LastValue: # NOTE: this will go away
             # just set last value to the current value and call it good
             self.LastValue[noderow] = value
           elif value != self.LastValue[noderow]:
@@ -166,16 +195,21 @@ class SimWrapper(object):
 
             if noderow not in YbusChanges:
               YbusChanges[noderow] = {}
-              YbusChanges[nodecol] = {}
 
             # check whether the switch is now open or closed and update accordingly
             if value == 0: # now open, hardwire admittance
               for nodecol in Ybus[noderow]:
-                Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = complex(-500.0, 500.0)
-                YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = complex(-500.0, 500.0)
+                if nodecol not in YbusChanges:
+                  YbusChanges[nodecol] = {}
+
+                Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = switchOpenValue
+                YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = switchOpenValue
 
             else: # now closed, restore admittance to original value
               for nodecol in Ybus[noderow]:
+                if nodecol not in YbusChanges:
+                  YbusChanges[nodecol] = {}
+
                 Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = YbusOrig[noderow][nodecol]
                 YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = YbusOrig[noderow][nodecol]
 
