@@ -108,27 +108,40 @@ class SimWrapper(object):
 
       # Questions:
       # 1. Do I need to process changes to LinearShuntCompensator conducting
-      #    equipment?
+      #    equipment? Ans: Yes, need guidance from Andy. Alex said I could
+      #    get a CIM dictionary value to plug into the diagonal element and this
+      #    would be the extent of what to change. Not sure how this relates to new
+      #    values coming from simulation output.
       # 2. Should I keep track of and publish the full Ybus or just the lower
-      #    diagonal elements (same for YbusChanges)?
+      #    diagonal elements (same for YbusChanges)? Ans: Just lower diagonal
       # 3. Do we need to keep/publish an index number based version of Ybus vs.
-      #    just the node name based version?
+      #    just the node name based version? Ans:  Don't think so as index is just
+      #    an artifact of the node list order and not meaningful
       # 4. Should the ActiveMQ message format for Ybus just be the "sparse"
-      #    dictionary of dictionaries?
+      #    dictionary of dictionaries? Ans: Yes
       # 5. Should the real and imaginary components of complex Ybus values be
       #    given as two separate floating point values in the published message
-      #    instead of some complex number representation?
+      #    instead of some complex number representation? Ans: If JSON directly
+      #    supports complex number representation vs. some ugly string conversion,
+      #    then do it as complex.  Otherwise, separate the components into floats
       # 6. Need verification of what I'm updating in Ybus and if the values I'm
-      #    updating to are correct for switches and transformers
+      #    updating to are correct for switches and transformers.  Ans:  Need
+      #    lots of guidance from Andy to straighten out what do to both for switches
+      #    and transformers.
       # 7. Aren't I missing at least updates to impacted nodes from switch state
       #    changes by only processing the Ybus row and not using Topology Processor
       #    for keeping track of what nodes are controlled by a switch?  Doesn't
       #    just updating the same Ybus row only get the direct connections to
       #    the switch node where it could deenergize much beyond that?
+      #    Ans: Yes, need TP awareness eventually.  Andy talked about creating a
+      #    separate Y-bus for each feeder and island.
       # 8. Is my approach of initializing the switch states and tap positions based
       #    on the first simulation output message legitimate or do I really need
       #    another way to do this?  For switches, I assume this would be that all
       #    switches start closed, but not sure on regulator tap positions.
+      #    Ans: tap positions all start at zero so I need one published Y-bus message
+      #    just to establish the initial state even though it's not a change per se.
+      #    Also, for open switches insert (0,0), closed is (-500,500)
 
       changedFlag = False
       YbusChanges = {}
