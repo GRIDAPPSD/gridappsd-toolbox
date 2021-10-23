@@ -142,6 +142,11 @@ class SimWrapper(object):
       #    Ans: tap positions all start at zero so I need one published Y-bus message
       #    just to establish the initial state even though it's not a change per se.
       #    Also, for open switches insert (0,0), closed is (-500,500)
+      #
+      #    Poorva thinks it would be better to use the alarm service than determining
+      #    changes from simulation output.  She said that the new switch state is
+      #    part of the alarm message and that if tap position wasn't already, it could
+      #    be easily added.
 
       changedFlag = False
       YbusChanges = {}
