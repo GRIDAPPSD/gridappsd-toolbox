@@ -110,69 +110,83 @@ class SimWrapper(object):
       # 1. Do I need to process changes to LinearShuntCompensator conducting
       #    equipment? Ans: Yes, need guidance from Andy. Alex said I could
       #    get a CIM dictionary value to plug into the diagonal element and this
-      #    would be the extent of what to change. Not sure how this relates to new
-      #    values coming from simulation output.
+      #    would be the extent of what to change. Not sure how this relates to
+      #    new values coming from simulation output.
+
       # 2. Should I keep track of and publish the full Ybus or just the lower
       #    diagonal elements (same for YbusChanges)? Ans: Just lower diagonal
+
       # 3. Do we need to keep/publish an index number based version of Ybus vs.
-      #    just the node name based version? Ans:  Don't think so as index is just
-      #    an artifact of the node list order and not meaningful
+      #    just the node name based version? Ans:  Don't think so as index is
+      #    just an artifact of the node list order and not meaningful
+
       # 4. Should the ActiveMQ message format for Ybus just be the "sparse"
       #    dictionary of dictionaries? Ans: Yes
+
       # 5. Should the real and imaginary components of complex Ybus values be
       #    given as two separate floating point values in the published message
       #    instead of some complex number representation? Ans: If JSON directly
-      #    supports complex number representation vs. some ugly string conversion,
-      #    then do it as complex.  Otherwise, separate the components into floats
+      #    supports complex number representation vs. some ugly string
+      #    conversion then do it as complex.  Otherwise, separate the
+      #    components into floats. Based on googling, it looks like JSON has
+      #    no direct support for complex numbers so need to separate components
+
+
       # 6. Need verification of what I'm updating in Ybus and if the values I'm
       #    updating to are correct for switches and transformers.  Ans:  Need
-      #    lots of guidance from Andy to straighten out what do to both for switches
-      #    and transformers.
+      #    lots of guidance from Andy to straighten out what do to both for
+      #    switches and transformers.
+
       # 7. Aren't I missing at least updates to impacted nodes from switch state
-      #    changes by only processing the Ybus row and not using Topology Processor
+      #    changes by only processing the Ybus row and not using Top Processor
       #    for keeping track of what nodes are controlled by a switch?  Doesn't
       #    just updating the same Ybus row only get the direct connections to
       #    the switch node where it could deenergize much beyond that?
-      #    Ans: Yes, need TP awareness eventually.  Andy talked about creating a
-      #    separate Y-bus for each feeder and island.
-      # 8. Is my approach of initializing the switch states and tap positions based
-      #    on the first simulation output message legitimate or do I really need
-      #    another way to do this?  For switches, I assume this would be that all
-      #    switches start closed, but not sure on regulator tap positions.
-      #    Ans: tap positions all start at zero so I need one published Y-bus message
-      #    just to establish the initial state even though it's not a change per se.
-      #    Also, for open switches insert (0,0), closed is (-500,500)
+      #    Ans: Yes, need TP awareness eventually.  Andy talked about creating
+      #    a separate Y-bus for each feeder and island.
+
+      # 8. Is my approach of initializing the switch states and tap positions
+      #    based on the first simulation output message legitimate or do I
+      #    really need another way to do this?  For switches, I assume this
+      #    would be that all switches start closed, but not sure on regulator
+      #    tap positions.  Ans: tap positions all start at zero so I need one
+      #    published Y-bus message just to establish the initial state even
+      #    though it's not a change per se. Also, for open switches insert
+      #    (0,0), closed is (-500,500)
       #
-      #    Poorva thinks it would be better to use the alarm service than determining
-      #    changes from simulation output.  She said that the new switch state is
-      #    part of the alarm message and that if tap position wasn't already, it could
-      #    be easily added.  Andy thinks that being this reliant on the alarm service
-      #    though isn't justified for this tool and we should stick with using
-      #    simulation output.
+      #    Poorva thinks it would be better to use the alarm service than
+      #    determining changes from simulation output.  She said that the new
+      #    switch state is part of the alarm message and that if tap position
+      #    wasn't already, it could be easily added.  Andy thinks that being
+      #    this reliant on the alarm service though isn't justified for this
+      #    tool and we should stick with usingsimulation output.
       #
-      #    From Dec 13 meeting with Andy, he advised using the intial Y-bus that's
-      #    determined from the Model Validator CIM Y-bus code to use as the basis
-      #    for initial values for both switches and tap positions.  For switches at
-      #    least, this seems doable.  I can look at the Y-bus value to determine if
-      #    the switch starts out open or closed based on the value.  Then I can
-      #    continue to do this instead of keeping a "last value" dictionary to
-      #    determine when I need to update Y-bus values.  Andy suggested if the values
-      #    indicate a closed switch, but says it's -1000 instead of -500, that I
-      #    update it to be -1000.  This would only be at the start though and maybe
-      #    never if I use the MV CIM code.  I'm still not sure how this would work
-      #    with regulator tap positions so code it for switches first to figure out
-      #    the implications for tap positions and whether I need to ask some questions.
+      #    From Dec 13 meeting with Andy, he advised using the intial Y-bus
+      #    that's determined from the Model Validator CIM Y-bus code to use as
+      #    the basis for initial values for both switches and tap positions.
+      #    For switches at least, this seems doable.  I can look at the Y-bus
+      #    value to determine if the switch starts out open or closed based on
+      #    the value.  Then I can continue to do this instead of keeping a
+      #    "last value" dictionary to determine when I need to update Y-bus
+      #    values.  Andy suggested if the values indicate a closed switch, but
+      #    says it's -1000 instead of -500, that I update it to be -500.  This
+      #    would only be at the start though and maybe never if I use the MV
+      #    CIM code.  I'm still not sure how this would work with regulator tap
+      #    positions so code it for switches first to figure out the
+      #    implications for tap positions and whether I need to ask some
+      #    questions.
       #
       #    Other Andy guidance:
-      #    * Use try/catch instead of checking 'value' in measurement.  Also, it's
-      #      not guaranteed that the mrid will exist either and this will catch that
-      #    * My LastValue logic will go away and I can hopefully always use the same
-      #      logic to determine changes both the first time through and after that.
-      #      Andy did figure out we'd need a last tap position though so this is not
-      #      the same for regulators.
-      #    * Get this working first for a monolithic Y-bus and then later come back
-      #      to consider a separate Y-bus per feeder and island.  This version might
-      #      need to be topology processor aware.
+      #    * Use try/catch instead of checking 'value' in measurement.  Also,
+      #      it's not guaranteed that the mrid will exist either and this will
+      #      catch that
+      #    * My LastValue logic will go away and I can hopefully always use the
+      #      same logic to determine changes both the first time through and
+      #      after that.  Andy did figure out we'd need a last tap position
+      #      though so this is not the same for regulators.
+      #    * Get this working first for a monolithic Y-bus and then later come
+      #      back to consider a separate Y-bus per feeder and island.  This
+      #      version might need to be topology processor aware.
 
       changedFlag = False
       YbusChanges = {}
