@@ -202,6 +202,11 @@ class SimWrapper(object):
           if noderow not in self.LastValue: # NOTE: this will go away
             # just set last value to the current value and call it good
             self.LastValue[noderow] = value
+            # DEBUG START
+            print('Switch initial value for node: ' + noderow + ', value: ' + str(value), flush=True)
+            for nodecol in self.Ybus[noderow]:
+              print('Switch initial Ybus value for row: ' + noderow + ', col: ' + nodecol + ', value: ' + str(self.Ybus[noderow][nodecol]), flush=True)
+            # DEBUG FINISH
           elif value != self.LastValue[noderow]:
             changedFlag = True
             print('Switch value changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
@@ -212,14 +217,14 @@ class SimWrapper(object):
 
             # check whether the switch is now open or closed and update accordingly
             if value == 0: # now open, hardwire admittance
-              for nodecol in Ybus[noderow]:
-                Ybus[noderow][nodecol] = switchOpenValue
+              for nodecol in self.Ybus[noderow]:
+                self.Ybus[noderow][nodecol] = switchOpenValue
                 YbusChanges[noderow][nodecol] = switchOpenValue
 
             else: # now closed, restore admittance to original value
-              for nodecol in Ybus[noderow]:
-                Ybus[noderow][nodecol] = YbusOrig[noderow][nodecol]
-                YbusChanges[noderow][nodecol] = YbusOrig[noderow][nodecol]
+              for nodecol in self.Ybus[noderow]:
+                self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
+                YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
 
           #else:
           #  print('Switch value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
@@ -254,13 +259,13 @@ class SimWrapper(object):
             tapPosMultiplier = 1.0 + (value - self.OrigTapPos[noderow])*0.0625
 
             # update Ybus based on the multiplier
-            for nodecol in Ybus[noderow]:
-              Ybus[noderow][nodecol] = YbusOrig[noderow][nodecol] * tapPosMultiplier
-              YbusChanges[noderow][nodecol] = YbusOrig[noderow][nodecol] * tapPosMultiplier
+            for nodecol in self.Ybus[noderow]:
+              self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol] * tapPosMultiplier
+              YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol] * tapPosMultiplier
 
             # for the diagonal element square the multiplier for YbusOrig
-            Ybus[noderow][noderow] = YbusOrig[noderow][noderow] * tapPosMultiplier**2
-            YbusChanges[noderow][noderow] = YbusOrig[noderow][noderow] * tapPosMultiplier**2
+            self.Ybus[noderow][noderow] = self.YbusOrig[noderow][noderow] * tapPosMultiplier**2
+            YbusChanges[noderow][noderow] = self.YbusOrig[noderow][noderow] * tapPosMultiplier**2
 
           #else:
           #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
