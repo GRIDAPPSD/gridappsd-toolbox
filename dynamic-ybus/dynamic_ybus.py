@@ -177,9 +177,9 @@ class SimWrapper(object):
       #    questions.
       #
       #    Other Andy guidance:
-      #    * Use try/catch instead of checking 'value' in measurement.  Also,
-      #      it's not guaranteed that the mrid will exist either and this will
-      #      catch that
+      #    * DONE Use try/except instead of checking 'value' in measurement.
+      #      Also, it's not guaranteed that the mrid will exist either and this
+      #      will catch that
       #    * My LastValue logic will go away and I can hopefully always use the
       #      same logic to determine changes both the first time through and
       #      after that.  Andy did figure out we'd need a last tap position
@@ -195,7 +195,7 @@ class SimWrapper(object):
       switchClosedValue = complex(-500,500)
 
       for mrid in self.SwitchMridToNode:
-        if 'value' in msgdict['measurements'][mrid]: # NOTE: use try/catch instead
+        try:
           value = msgdict['measurements'][mrid]['value']
           noderow = self.SwitchMridToNode[mrid]
           print('Found switch mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
@@ -224,11 +224,16 @@ class SimWrapper(object):
           #else:
           #  print('Switch value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
 
-        else:
-          print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+        except:
+          if mrid not in msgdict['measurements']:
+            print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+          elif 'value' not in msgdict['measurements'][mrid]:
+            print('*** WARNING: Did not find value element for switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+          else:
+            print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
       for mrid in self.TransformerMridToNode:
-        if 'value' in msgdict['measurements'][mrid]:
+        try:
           value = msgdict['measurements'][mrid]['value']
           noderow = self.TransformerMridToNode[mrid]
           print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
@@ -260,8 +265,13 @@ class SimWrapper(object):
           #else:
           #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
 
-        else:
-          print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+        except:
+          if mrid not in msgdict['measurements']:
+            print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+          elif 'value' not in msgdict['measurements'][mrid]:
+            print('*** WARNING: Did not find value element for transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+          else:
+            print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
       if changedFlag:
         print('changedFlag set so I will publish full Ybus and minimal YbusChanges', flush=True)
