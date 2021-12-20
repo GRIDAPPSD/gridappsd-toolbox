@@ -113,12 +113,12 @@ class SimWrapper(object):
       #    would be the extent of what to change. Not sure how this relates to
       #    new values coming from simulation output.
 
-      # 2. Should I keep track of and publish the full Ybus or just the lower
-      #    diagonal elements (same for YbusChanges)? Ans: Just lower diagonal
+      # 2. DONE Should I keep track of and publish the full Ybus or just the
+      #    lower diagonal elements (same for YbusChanges)? Ans: Just lower diag
 
-      # 3. Do we need to keep/publish an index number based version of Ybus vs.
-      #    just the node name based version? Ans:  Don't think so as index is
-      #    just an artifact of the node list order and not meaningful
+      # 3. DONE Do we need to keep/publish an index number based version of Ybus
+      #    vs. just the node name based version? Ans:  Don't think so as index
+      #    is just an artifact of the node list order and not meaningful
 
       # 4. Should the ActiveMQ message format for Ybus just be the "sparse"
       #    dictionary of dictionaries? Ans: Yes
@@ -154,7 +154,7 @@ class SimWrapper(object):
       #    though it's not a change per se. Also, for open switches insert
       #    (0,0), closed is (-500,500)
       #
-      #    Poorva thinks it would be better to use the alarm service than
+      #    DONE Poorva thinks it would be better to use the alarm service than
       #    determining changes from simulation output.  She said that the new
       #    switch state is part of the alarm message and that if tap position
       #    wasn't already, it could be easily added.  Andy thinks that being
@@ -213,19 +213,13 @@ class SimWrapper(object):
             # check whether the switch is now open or closed and update accordingly
             if value == 0: # now open, hardwire admittance
               for nodecol in Ybus[noderow]:
-                if nodecol not in YbusChanges:
-                  YbusChanges[nodecol] = {}
-
-                Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = switchOpenValue
-                YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = switchOpenValue
+                Ybus[noderow][nodecol] = switchOpenValue
+                YbusChanges[noderow][nodecol] = switchOpenValue
 
             else: # now closed, restore admittance to original value
               for nodecol in Ybus[noderow]:
-                if nodecol not in YbusChanges:
-                  YbusChanges[nodecol] = {}
-
-                Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = YbusOrig[noderow][nodecol]
-                YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = YbusOrig[noderow][nodecol]
+                Ybus[noderow][nodecol] = YbusOrig[noderow][nodecol]
+                YbusChanges[noderow][nodecol] = YbusOrig[noderow][nodecol]
 
           #else:
           #  print('Switch value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
@@ -249,7 +243,6 @@ class SimWrapper(object):
 
             if noderow not in YbusChanges:
               YbusChanges[noderow] = {}
-              YbusChanges[nodecol] = {}
 
             # calculate the admittance multiplier based on the change in the tap
             # position vs. the original position
@@ -257,10 +250,8 @@ class SimWrapper(object):
 
             # update Ybus based on the multiplier
             for nodecol in Ybus[noderow]:
-              Ybus[noderow][nodecol] = Ybus[nodecol][noderow] = \
-                                       YbusOrig[noderow][nodecol] * tapPosMultiplier
-              YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = \
-                                       YbusOrig[noderow][nodecol] * tapPosMultiplier
+              Ybus[noderow][nodecol] = YbusOrig[noderow][nodecol] * tapPosMultiplier
+              YbusChanges[noderow][nodecol] = YbusOrig[noderow][nodecol] * tapPosMultiplier
 
             # for the diagonal element square the multiplier for YbusOrig
             Ybus[noderow][noderow] = YbusOrig[noderow][noderow] * tapPosMultiplier**2
@@ -337,9 +328,7 @@ def ybus_export(gapps, feeder_mrid):
       continue
     if Nodes[int(items[0])] not in Ybus:
       Ybus[Nodes[int(items[0])]] = {}
-    if Nodes[int(items[1])] not in Ybus:
-      Ybus[Nodes[int(items[1])]] = {}
-    Ybus[Nodes[int(items[0])]][Nodes[int(items[1])]] = Ybus[Nodes[int(items[1])]][Nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
+    Ybus[Nodes[int(items[0])]][Nodes[int(items[1])]] = complex(float(items[2]), float(items[3]))
   pprint.pprint(Ybus)
 
   return Nodes,Ybus
