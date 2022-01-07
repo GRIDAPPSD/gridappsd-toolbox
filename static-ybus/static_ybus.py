@@ -54,8 +54,7 @@ import numpy as np
 from gridappsd import GridAPPSD
 
 
-# START LINES
-def fillYbusUnique_lines(bus1, bus2, Yval, Ybus):
+def fillYbusUnique(bus1, bus2, Yval, Ybus):
     if Yval == 0j:
         return
 
@@ -63,11 +62,25 @@ def fillYbusUnique_lines(bus1, bus2, Yval, Ybus):
         Ybus[bus1] = {}
 
     if bus2 in Ybus[bus1]:
-        print('    *** WARNING: Unexpected existing value found for Ybus[' + bus1 + '][' + bus2 + '] when filling line model value\n', flush=True)
+        print('    *** WARNING: Unexpected existing value found for Ybus[' + bus1 + '][' + bus2 + '] when filling model value\n', flush=True)
 
     Ybus[bus1][bus2] = Yval
 
 
+def fillYbusAdd(bus1, bus2, Yval, Ybus):
+    if Yval == 0j:
+        return
+
+    if bus1 not in Ybus:
+        Ybus[bus1] = {}
+
+    if bus2 in Ybus[bus1]:
+        Ybus[bus1][bus2] += Yval
+    else:
+        Ybus[bus1][bus2] = Yval
+
+
+# START LINES
 def fillYbusUniqueUpper_lines(bus1, bus2, Yval, Ybus):
     if Yval == 0j:
         return
@@ -90,24 +103,11 @@ def fillYbusUniqueUpper_lines(bus1, bus2, Yval, Ybus):
     Ybus[bus1][bus2] = Ybus[bus3][bus4] = Yval
 
 
-def fillYbusAdd_lines(bus1, bus2, Yval, Ybus):
-    if Yval == 0j:
-        return
-
-    if bus1 not in Ybus:
-        Ybus[bus1] = {}
-
-    if bus2 in Ybus[bus1]:
-        Ybus[bus1][bus2] += Yval
-    else:
-        Ybus[bus1][bus2] = Yval
-
-
 def fillYbusNoSwap_lines(bus1, bus2, Yval, Ybus):
     #print('fillYbusNoSwap_lines bus1: ' + bus1 + ', bus2: ' + bus2, flush=True)
-    fillYbusUnique_lines(bus2, bus1, Yval, Ybus)
-    fillYbusAdd_lines(bus1, bus1, -Yval, Ybus)
-    fillYbusAdd_lines(bus2, bus2, -Yval, Ybus)
+    fillYbusUnique(bus2, bus1, Yval, Ybus)
+    fillYbusAdd(bus1, bus1, -Yval, Ybus)
+    fillYbusAdd(bus2, bus2, -Yval, Ybus)
 
 
 def fillYbusSwap_lines(bus1, bus2, Yval, Ybus):
@@ -119,8 +119,8 @@ def fillYbusSwap_lines(bus1, bus2, Yval, Ybus):
     node2,phase2 = bus2.split('.')
 
     # mix-and-match nodes and phases for filling Ybus
-    fillYbusAdd_lines(bus1, node1+'.'+phase2, -Yval, Ybus)
-    fillYbusAdd_lines(node2+'.'+phase1, bus2, -Yval, Ybus)
+    fillYbusAdd(bus1, node1+'.'+phase2, -Yval, Ybus)
+    fillYbusAdd(node2+'.'+phase1, bus2, -Yval, Ybus)
 
 
 def fill_Ybus_PerLengthPhaseImpedance_lines(sparql_mgr, Ybus):
@@ -795,69 +795,43 @@ def fill_Ybus_WireInfo_and_WireSpacingInfo_lines(sparql_mgr, Ybus):
 # FINISH LINES
 
 # START TRANSFORMERS
-def fillYbusUnique_xfmrs(bus1, bus2, Yval, Ybus):
-    if Yval == 0j:
-        return
-
-    if bus1 not in Ybus:
-        Ybus[bus1] = {}
-
-    if bus2 in Ybus[bus1]:
-        print('    *** WARNING: Unexpected existing value found for Ybus[' + bus1 + '][' + bus2 + '] when filling power transformer value\n', flush=True)
-
-    Ybus[bus1][bus2] = Yval
-
-
-def fillYbusAdd_xfmrs(bus1, bus2, Yval, Ybus):
-    if Yval == 0j:
-        return
-
-    if bus1 not in Ybus:
-        Ybus[bus1] = {}
-
-    if bus2 in Ybus[bus1]:
-        Ybus[bus1][bus2] += Yval
-    else:
-        Ybus[bus1][bus2] = Yval
-
-
 def fillYbus_6x6_xfmrs(bus1, bus2, DY_flag, Ycomp, Ybus):
     # fill Ybus directly from Ycomp
     # first fill the ones that are independent of DY_flag
     # either because the same bus is used or the same phase
-    fillYbusAdd_xfmrs(bus1+'.1', bus1+'.1', Ycomp[0,0], Ybus)
-    fillYbusAdd_xfmrs(bus1+'.2', bus1+'.1', Ycomp[1,0], Ybus)
-    fillYbusAdd_xfmrs(bus1+'.2', bus1+'.2', Ycomp[1,1], Ybus)
-    fillYbusAdd_xfmrs(bus1+'.3', bus1+'.1', Ycomp[2,0], Ybus)
-    fillYbusAdd_xfmrs(bus1+'.3', bus1+'.2', Ycomp[2,1], Ybus)
-    fillYbusAdd_xfmrs(bus1+'.3', bus1+'.3', Ycomp[2,2], Ybus)
-    fillYbusUnique_xfmrs(bus2+'.1', bus1+'.1', Ycomp[3,0], Ybus)
-    fillYbusAdd_xfmrs(bus2+'.1', bus2+'.1', Ycomp[3,3], Ybus)
-    fillYbusUnique_xfmrs(bus2+'.2', bus1+'.2', Ycomp[4,1], Ybus)
-    fillYbusAdd_xfmrs(bus2+'.2', bus2+'.1', Ycomp[4,3], Ybus)
-    fillYbusAdd_xfmrs(bus2+'.2', bus2+'.2', Ycomp[4,4], Ybus)
-    fillYbusUnique_xfmrs(bus2+'.3', bus1+'.3', Ycomp[5,2], Ybus)
-    fillYbusAdd_xfmrs(bus2+'.3', bus2+'.1', Ycomp[5,3], Ybus)
-    fillYbusAdd_xfmrs(bus2+'.3', bus2+'.2', Ycomp[5,4], Ybus)
-    fillYbusAdd_xfmrs(bus2+'.3', bus2+'.3', Ycomp[5,5], Ybus)
+    fillYbusAdd(bus1+'.1', bus1+'.1', Ycomp[0,0], Ybus)
+    fillYbusAdd(bus1+'.2', bus1+'.1', Ycomp[1,0], Ybus)
+    fillYbusAdd(bus1+'.2', bus1+'.2', Ycomp[1,1], Ybus)
+    fillYbusAdd(bus1+'.3', bus1+'.1', Ycomp[2,0], Ybus)
+    fillYbusAdd(bus1+'.3', bus1+'.2', Ycomp[2,1], Ybus)
+    fillYbusAdd(bus1+'.3', bus1+'.3', Ycomp[2,2], Ybus)
+    fillYbusUnique(bus2+'.1', bus1+'.1', Ycomp[3,0], Ybus)
+    fillYbusAdd(bus2+'.1', bus2+'.1', Ycomp[3,3], Ybus)
+    fillYbusUnique(bus2+'.2', bus1+'.2', Ycomp[4,1], Ybus)
+    fillYbusAdd(bus2+'.2', bus2+'.1', Ycomp[4,3], Ybus)
+    fillYbusAdd(bus2+'.2', bus2+'.2', Ycomp[4,4], Ybus)
+    fillYbusUnique(bus2+'.3', bus1+'.3', Ycomp[5,2], Ybus)
+    fillYbusAdd(bus2+'.3', bus2+'.1', Ycomp[5,3], Ybus)
+    fillYbusAdd(bus2+'.3', bus2+'.2', Ycomp[5,4], Ybus)
+    fillYbusAdd(bus2+'.3', bus2+'.3', Ycomp[5,5], Ybus)
 
     # now fill the ones that are dependent on DY_flag, which
     # are different bus and different phase
     if DY_flag:
-        fillYbusUnique_xfmrs(bus2+'.1', bus1+'.2', Ycomp[4,0], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.1', bus1+'.3', Ycomp[5,0], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.2', bus1+'.1', Ycomp[3,1], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.2', bus1+'.3', Ycomp[5,1], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.3', bus1+'.1', Ycomp[3,2], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.3', bus1+'.2', Ycomp[4,2], Ybus)
+        fillYbusUnique(bus2+'.1', bus1+'.2', Ycomp[4,0], Ybus)
+        fillYbusUnique(bus2+'.1', bus1+'.3', Ycomp[5,0], Ybus)
+        fillYbusUnique(bus2+'.2', bus1+'.1', Ycomp[3,1], Ybus)
+        fillYbusUnique(bus2+'.2', bus1+'.3', Ycomp[5,1], Ybus)
+        fillYbusUnique(bus2+'.3', bus1+'.1', Ycomp[3,2], Ybus)
+        fillYbusUnique(bus2+'.3', bus1+'.2', Ycomp[4,2], Ybus)
 
     else:
-        fillYbusUnique_xfmrs(bus2+'.2', bus1+'.1', Ycomp[4,0], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.3', bus1+'.1', Ycomp[5,0], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.1', bus1+'.2', Ycomp[3,1], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.3', bus1+'.2', Ycomp[5,1], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.1', bus1+'.3', Ycomp[3,2], Ybus)
-        fillYbusUnique_xfmrs(bus2+'.2', bus1+'.3', Ycomp[4,2], Ybus)
+        fillYbusUnique(bus2+'.2', bus1+'.1', Ycomp[4,0], Ybus)
+        fillYbusUnique(bus2+'.3', bus1+'.1', Ycomp[5,0], Ybus)
+        fillYbusUnique(bus2+'.1', bus1+'.2', Ycomp[3,1], Ybus)
+        fillYbusUnique(bus2+'.3', bus1+'.2', Ycomp[5,1], Ybus)
+        fillYbusUnique(bus2+'.1', bus1+'.3', Ycomp[3,2], Ybus)
+        fillYbusUnique(bus2+'.2', bus1+'.3', Ycomp[4,2], Ybus)
 
 
 def fill_Ybus_PowerTransformerEnd_xfmrs(sparql_mgr, Ybus):
@@ -1271,12 +1245,12 @@ def fill_Ybus_TransformerTank_xfmrs(sparql_mgr, Ybus):
             Ycomp = np.delete(Ycomp, 1, 0)
             Ycomp = np.delete(Ycomp, 1, 1)
 
-            fillYbusAdd_xfmrs(bus1, bus1, Ycomp[0,0], Ybus)
-            fillYbusUnique_xfmrs(bus2, bus1, Ycomp[1,0], Ybus)
-            fillYbusAdd_xfmrs(bus2, bus2, Ycomp[1,1], Ybus)
-            fillYbusUnique_xfmrs(bus3, bus1, Ycomp[2,0], Ybus)
-            fillYbusAdd_xfmrs(bus3, bus2, Ycomp[2,1], Ybus)
-            fillYbusAdd_xfmrs(bus3, bus3, Ycomp[2,2], Ybus)
+            fillYbusAdd(bus1, bus1, Ycomp[0,0], Ybus)
+            fillYbusUnique(bus2, bus1, Ycomp[1,0], Ybus)
+            fillYbusAdd(bus2, bus2, Ycomp[1,1], Ybus)
+            fillYbusUnique(bus3, bus1, Ycomp[2,0], Ybus)
+            fillYbusAdd(bus3, bus2, Ycomp[2,1], Ybus)
+            fillYbusAdd(bus3, bus3, Ycomp[2,2], Ybus)
 
         else:
             bus1 = Bus[xfmr_name][1] + ybusPhaseIdx[Phase[xfmr_name][1]]
@@ -1289,9 +1263,9 @@ def fill_Ybus_TransformerTank_xfmrs(sparql_mgr, Ybus):
             Ycomp = np.delete(Ycomp, 1, 0)
             Ycomp = np.delete(Ycomp, 1, 1)
 
-            fillYbusAdd_xfmrs(bus1, bus1, Ycomp[0,0], Ybus)
-            fillYbusUnique_xfmrs(bus2, bus1, Ycomp[1,0], Ybus)
-            fillYbusAdd_xfmrs(bus2, bus2, Ycomp[1,1], Ybus)
+            fillYbusAdd(bus1, bus1, Ycomp[0,0], Ybus)
+            fillYbusUnique(bus2, bus1, Ycomp[1,0], Ybus)
+            fillYbusAdd(bus2, bus2, Ycomp[1,1], Ybus)
 # FINISH TRANSFORMERS
 
 # START SWITCHES
