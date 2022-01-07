@@ -107,7 +107,7 @@ class SimWrapper(object):
       #    (maybe just lower diagonal) and just for changed elements
 
       # Questions:
-      # 1. Do I need to process changes to LinearShuntCompensator conducting
+      # 1. HOLD Do I need to process changes to LinearShuntCompensator conducting
       #    equipment? Ans: Yes, need guidance from Andy. Alex said I could
       #    get a CIM dictionary value to plug into the diagonal element and this
       #    would be the extent of what to change. Not sure how this relates to
@@ -284,21 +284,15 @@ class SimWrapper(object):
         print('changedFlag NOT set so nothing to do', flush=True)
 
 
-def cim_export(gapps, simulation_id):
-    message = {
-      "configurationType":"CIM Dictionary",
-      "parameters": {
-        "simulation_id": simulation_id }
-    }
-
-    results = gapps.get_response('goss.gridappsd.process.request.config', message, timeout=1200)
+def nodes_to_watch(sparql_mgr):
+    feeders = sparql_mgr.cim_export()
 
     phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
 
     SwitchMridToNode = {}
     TransformerMridToNode = {}
-    for feeders in results['data']['feeders']:
-        for meas in feeders['measurements']:
+    for feeder in feeders:
+        for meas in feeder['measurements']:
             # Pos measurement type includes both switches and regulators
             if meas['measurementType'] == 'Pos':
                 if meas['ConductingEquipment_type'] == 'LoadBreakSwitch':
@@ -309,7 +303,7 @@ def cim_export(gapps, simulation_id):
                   node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
                   TransformerMridToNode[meas['mRID']] = node.upper()
                   print('Transformer mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
-                # TODO: do we need to handle LinearShuntCompensator?
+                # TODO: Handle LinearShuntCompensator?
                 #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
 
     print('Switches:', flush=True)
@@ -320,24 +314,18 @@ def cim_export(gapps, simulation_id):
     return SwitchMridToNode,TransformerMridToNode
 
 
-def ybus_export(gapps, feeder_mrid):
-  message = {
-    "configurationType": "YBus Export",
-    "parameters": {
-      "model_id": feeder_mrid}
-  }
-
-  results = gapps.get_response("goss.gridappsd.process.request.config", message, timeout=1200)
+def opendss_ybus(sparql_mgr):
+  yParse,nodeList = sparql_mgr.ybus_export()
 
   idx = 1
   Nodes = {}
-  for obj in results['data']['nodeList']:
+  for obj in nodeList:
     Nodes[idx] = obj.strip('\"')
     idx += 1
   pprint.pprint(Nodes)
 
   Ybus = {}
-  for obj in results['data']['yParse']:
+  for obj in yParse:
     items = obj.split(',')
     if items[0] == 'Row':
       continue
@@ -346,7 +334,7 @@ def ybus_export(gapps, feeder_mrid):
     Ybus[Nodes[int(items[0])]][Nodes[int(items[1])]] = complex(float(items[2]), float(items[3]))
   pprint.pprint(Ybus)
 
-  return Nodes,Ybus
+  return Ybus
 
 
 def ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode):
@@ -375,24 +363,49 @@ def ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode):
   return YbusOrig
 
 
+def ybus_save_original_xfmrs(Ybus, TransformerMridToNode):
+  YbusOrig = {}
+
+  for noderow in TransformerMridToNode.values():
+    if noderow not in YbusOrig:
+      YbusOrig[noderow] = {}
+
+    for nodecol,value in Ybus[noderow].items():
+      # could store the value with row and col reversed as well, but don't
+      # currently need it
+      YbusOrig[noderow][nodecol] = value
+
+  #pprint.pprint(YbusOrig)
+
+  return YbusOrig
+
+
 def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   global logfile
   logfile = log_file
 
   gapps = GridAPPSD()
 
-  SwitchMridToNode,TransformerMridToNode = cim_export(gapps, simulation_id)
+  SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
+  sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-  #Nodes,Ybus = ybus_export(gapps, feeder_mrid)
+  SwitchMridToNode,TransformerMridToNode = nodes_to_watch(sparql_mgr)
+
   # Get starting Ybus from static_ybus module
   mod_import = importlib.import_module('static-ybus.static_ybus')
   static_ybus_func = getattr(mod_import, 'static_ybus')
   Ybus = static_ybus_func(feeder_mrid)
+  # Get starting Ybus from OpenDSS
+  #Ybus = opendss_ybus(sparql_mgr)
 
   # Save the starting Ybus values for all the entries that could change based
   # on switch and transformer value changes (no reason to save the values that
   # will never change)
+  # TODO use first version if admittances will be changed for nodes in the
+  # same Ybus row of a switch will be changed and second call if only the
+  # switch node itself will be changed
   YbusOrig = ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode)
+  #YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
 
   simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
