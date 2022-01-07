@@ -855,19 +855,13 @@ def fill_Ybus_PowerTransformerEnd_xfmrs(sparql_mgr, Ybus):
     #bindings = sparql_mgr.PowerTransformerEnd_xfmr_admittances()
     #print('POWER_TRANSFORMER_VALIDATOR PowerTransformerEnd xfmr_admittances query results:', flush=True)
     #print(bindings, flush=True)
-    #print('POWER_TRANSFORMER_VALIDATOR PowerTransformerEnd xfmr_admittances query results:', file=logfile)
-    #print(bindings, file=logfile)
 
     #if len(bindings) == 0:
-    #    print('\nPOWER_TRANSFORMER_VALIDATOR PowerTransformerEnd: NO TRANSFORMER MATCHES', flush=True)
-    #    print('\nPOWER_TRANSFORMER_VALIDATOR PowerTransformerEnd: NO TRANSFORMER MATCHES', file=logfile)
-    #    return xfmrs_count
+    #    return
 
     bindings = sparql_mgr.PowerTransformerEnd_xfmr_names()
     #print('POWER_TRANSFORMER_VALIDATOR PowerTransformerEnd xfmr_names query results:', flush=True)
     #print(bindings, flush=True)
-    #print('POWER_TRANSFORMER_VALIDATOR PowerTransformerEnd xfmr_names query results:', file=logfile)
-    #print(bindings, file=logfile)
 
     if len(bindings) == 0:
         return
@@ -888,7 +882,6 @@ def fill_Ybus_PowerTransformerEnd_xfmrs(sparql_mgr, Ybus):
             bus2 = Bus[xfmr_name][2]
             bus3 = obj['bus']['value'].upper()
             print('\n*** WARNING: 3-winding, 3-phase PowerTransformerEnd transformers are not supported, xfmr: ' + xfmr_name + ', bus1: ' + bus1 + ', bus2: ' + bus2 + ', bus3: ' + bus3 + '\n', flush=True)
-            print('\n*** WARNING: 3-winding, 3-phase PowerTransformerEnd transformers are not supported, xfmr: ' + xfmr_name + ', bus1: ' + bus1 + ', bus2: ' + bus2 + ', bus3: ' + bus3 + '\n', file=logfile)
             Unsupported[bus1] = Unsupported[bus2] = Unsupported[bus3] = [(bus1, bus2, bus3), '3-winding 3-phase transformer']
 
             # need to clear out the previous dictionary entries for this
@@ -1275,7 +1268,6 @@ def fillYbusUnique_switches(bus1, bus2, Ybus):
 
     if bus2 in Ybus[bus1]:
         print('    *** WARNING: Unexpected existing value found for Ybus[' + bus1 + '][' + bus2 + '] when filling switching equipment value\n', flush=True)
-        print('    *** WARNING: Unexpected existing value found for Ybus[' + bus1 + '][' + bus2 + '] when filling switching equipment value\n', file=logfile)
 
     # if needed, here's how to find the two immediate calling functions
     #if bus2=='X2673305B.1' and bus1=='X2673305B.2':
@@ -1342,10 +1334,7 @@ def fill_Ybus_SwitchingEquipment_switches(sparql_mgr, Ybus):
 # FINISH SWITCHES
 
 
-def start(log_file, feeder_mrid):
-    global logfile
-    logfile = log_file
-
+def static_ybus(feeder_mrid):
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
 
     gapps = GridAPPSD()
@@ -1396,6 +1385,8 @@ def start(log_file, feeder_mrid):
         ysysCount += len(Ybus[bus1])
     print('\nTotal static Ybus # entries: ' + str(ysysCount) + '\n', flush=True)
 
+    return Ybus
+
 
 def _main():
     # for loading modules
@@ -1411,9 +1402,7 @@ def _main():
     sim_request = json.loads(opts.request.replace("\'",""))
     feeder_mrid = sim_request["power_system_config"]["Line_name"]
 
-    log_file = open('static_ybus.log', 'w')
-
-    start(log_file, feeder_mrid)
+    Ybus = static_ybus(feeder_mrid)
 
 
 if __name__ == "__main__":
