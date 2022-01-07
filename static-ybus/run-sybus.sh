@@ -11,30 +11,12 @@
 if [[ -z "$SIMREQ" ]]; then
     # requires at least a reference to the type of simulation to use
     if [ "$#" -eq 0 ]; then
-        echo "Usage: ./run-ybus.sh #nodes"
+        echo "Usage: ./run-sybus.sh #nodes"
         echo
         exit
     fi
 
-    if [ "$#" -lt 2 ]; then
-        # invocation when sim_starter.py will start the simulation
-        read -d "\n" SIMID SIMREQ <<< $(sim_starter/sim_starter.py $1)
-        # need to wait after starting a simulation so that it's initialized to
-        # the point it will respond to queries/subscriptions
-        if [[ "$1" == "9500" ]]; then
-            echo "Sleeping 40 seconds to allow simulation to initialize..."
-            sleep 40
-        else
-            echo "Sleeping 10 seconds to allow simulation to initialize..."
-            sleep 10
-        fi
-    else
-        # invocation when sim_starter.py will return $SIMREQ and not start a simulation
-        read -d "\n" SIMREQ <<< $(sim_starter/sim_starter.py $1 $2)
-    fi
-else
-#   invocation when simulation is already started from platform viz
-    SIMID=$1
+    read -d "\n" SIMREQ <<< $(sim_starter/sim_starter.py $1 nosim)
 fi
 
 python3 ./static_ybus.py --request "$SIMREQ" 2>&1
