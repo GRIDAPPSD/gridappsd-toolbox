@@ -264,20 +264,6 @@ def fill_Ybus_PerLengthSequenceImpedance_lines(sparql_mgr, Ybus):
     if len(bindings) == 0:
         return
 
-    if cmpFlag:
-        global minPercentDiffReal, maxPercentDiffReal
-        minPercentDiffReal = sys.float_info.max
-        maxPercentDiffReal = -sys.float_info.max
-        global minPercentDiffImag, maxPercentDiffImag
-        minPercentDiffImag = sys.float_info.max
-        maxPercentDiffImag = -sys.float_info.max
-        global greenCountReal, yellowCountReal, redCountReal
-        greenCountReal = yellowCountReal = redCountReal = 0
-        global greenCountImag, yellowCountImag, redCountImag
-        greenCountImag = yellowCountImag = redCountImag = 0
-        global greenCount, yellowCount, redCount
-        greenCount = yellowCount = redCount = 0
-
     for obj in bindings:
         line_name = obj['line_name']['value']
         bus1 = obj['bus1']['value'].upper()
@@ -667,9 +653,6 @@ def fill_Ybus_WireInfo_and_WireSpacingInfo_lines(sparql_mgr, Ybus):
                 if dim == 2:
                     Zprim = np.empty((3,3), dtype=complex)
                 else:
-                    if cmpFlag:
-                        print('WARNING: TapeShieldCableInfo implementation only supports 1 phase and not the number found: ' + str(dim-1), flush=True)
-                        print('WARNING: TapeShieldCableInfo implementation only supports 1 phase and not the number found: ' + str(dim-1), file=logfile)
                     tape_skip = True
                     continue
 
