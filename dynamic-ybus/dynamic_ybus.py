@@ -375,7 +375,7 @@ def ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode):
   return YbusOrig
 
 
-def start(log_file, feeder_mrid, model_api_topic, simulation_id):
+def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   global logfile
   logfile = log_file
 
@@ -383,7 +383,11 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
   SwitchMridToNode,TransformerMridToNode = cim_export(gapps, simulation_id)
 
-  Nodes,Ybus = ybus_export(gapps, feeder_mrid)
+  #Nodes,Ybus = ybus_export(gapps, feeder_mrid)
+  # Get starting Ybus from static_ybus module
+  mod_import = importlib.import_module('static-ybus.static_ybus')
+  static_ybus_func = getattr(mod_import, 'static_ybus')
+  Ybus = static_ybus_func(feeder_mrid)
 
   # Save the starting Ybus values for all the entries that could change based
   # on switch and transformer value changes (no reason to save the values that
@@ -409,6 +413,12 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
 
 def _main():
+  # for loading modules (this works for finding static-ybus too)
+  if (os.path.isdir('shared')):
+    sys.path.append('.')
+  elif (os.path.isdir('../shared')):
+    sys.path.append('..')
+   
   parser = argparse.ArgumentParser()
   parser.add_argument("--request", help="Simulation Request")
   parser.add_argument("--simid", help="Simulation ID")
@@ -418,10 +428,9 @@ def _main():
   feeder_mrid = sim_request["power_system_config"]["Line_name"]
   simulation_id = opts.simid
 
-  model_api_topic = "goss.gridappsd.process.request.data.powergridmodel"
   log_file = open('dynamic_ybus.log', 'w')
 
-  start(log_file, feeder_mrid, model_api_topic, simulation_id)
+  dynamic_ybus(log_file, feeder_mrid, simulation_id)
 
 
 if __name__ == "__main__":
