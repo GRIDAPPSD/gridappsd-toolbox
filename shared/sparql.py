@@ -617,3 +617,14 @@ class SPARQLManager:
         results = self.gad.get_response("goss.gridappsd.process.request.config", message, timeout=1200)
         return results['data']['vnom']
 
+
+    def cim_export(self):
+        message = {
+        "configurationType":"CIM Dictionary",
+        "parameters": {
+            "simulation_id": self.simulation_id }
+        }
+
+        results = self.gad.get_response('goss.gridappsd.process.request.config', message, timeout=1200)
+        return results['data']['feeders']
+
