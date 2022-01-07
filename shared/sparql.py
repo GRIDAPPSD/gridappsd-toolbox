@@ -10,7 +10,7 @@ class SPARQLManager:
     """
 
     
-    def __init__(self, gapps, feeder_mrid, model_api_topic, simulation_id=None, timeout=30):
+    def __init__(self, gapps, feeder_mrid, simulation_id=None, timeout=30):
         """Connect to the platform.
 
         :param feeder_mrid: unique identifier for the feeder in
@@ -29,9 +29,6 @@ class SPARQLManager:
 
         # Timeout for SPARQL queries.
         self.timeout = timeout
-
-        # Powergridmodel API topic
-        self.topic = model_api_topic
 
         # Assign simulation id
         self.simulation_id = simulation_id
