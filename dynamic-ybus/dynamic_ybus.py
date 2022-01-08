@@ -244,6 +244,19 @@ class SimWrapper(object):
           else:
             print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
+      # START HERE
+      # For transformers I think I should start by assuming tap position is 0
+      # and saving away the original value for this.  If this isn't the case
+      # then hopefully I can devise a query to get the starting position or
+      # somehow calculate it.  Anyway, with this some of my existing logic
+      # below will be useful to get the new values and at least for transformers
+      # I do know I need to update the other columns for the row
+      # Either save away the initial tap position number so I can use that in
+      # my calcuation to update the value or I could "normalize" the original
+      # Ybus values to figuring out what it would be for position 0 and set
+      # that as the original Ybus value so I don't need to bring the original
+      # tap position number into the calculation
+
       for mrid in self.TransformerMridToNode:
         try:
           value = msgdict['measurements'][mrid]['value']
