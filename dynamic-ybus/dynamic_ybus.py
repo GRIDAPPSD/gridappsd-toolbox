@@ -74,14 +74,14 @@ class SimWrapper(object):
     return self.keepLoopingFlag
 
 
-  def checkSwitchClosed(self, noderow):
-    Yval = self.Ybus[noderow][noderow].real
-    return (Yval>=-1000.0 and Yval<=-500.0)
-
-
   def checkSwitchOpen(self, noderow):
     Yval = self.Ybus[noderow][noderow].real
     return (abs(Yval) <= 0.001)
+
+
+  def checkSwitchClosed(self, noderow):
+    Yval = self.Ybus[noderow][noderow].real
+    return (Yval>=-1000.0 and Yval<=-500.0)
 
 
   def on_message(self, header, message):
@@ -130,17 +130,16 @@ class SimWrapper(object):
       #    vs. just the node name based version? Ans:  Don't think so as index
       #    is just an artifact of the node list order and not meaningful
 
-      # 4. Should the ActiveMQ message format for Ybus just be the "sparse"
+      # 4. HOLD Should the ActiveMQ message format for Ybus just be the "sparse"
       #    dictionary of dictionaries? Ans: Yes
 
-      # 5. Should the real and imaginary components of complex Ybus values be
+      # 5. HOLD Should the real and imaginary components of complex Ybus values be
       #    given as two separate floating point values in the published message
       #    instead of some complex number representation? Ans: If JSON directly
       #    supports complex number representation vs. some ugly string
       #    conversion then do it as complex.  Otherwise, separate the
       #    components into floats. Based on googling, it looks like JSON has
       #    no direct support for complex numbers so need to separate components
-
 
       # 6. Need verification of what I'm updating in Ybus and if the values I'm
       #    updating to are correct for switches and transformers.  Ans:  Need
@@ -153,7 +152,7 @@ class SimWrapper(object):
       #    just updating the same Ybus row only get the direct connections to
       #    the switch node where it could deenergize much beyond that?
       #    Ans: Yes, need TP awareness eventually.  Andy talked about creating
-      #    a separate Y-bus for each feeder and island.
+      #    a separate Y-bus for each feeder and island. Need more guidance.
 
       # 8. Is my approach of initializing the switch states and tap positions
       #    based on the first simulation output message legitimate or do I
@@ -171,7 +170,7 @@ class SimWrapper(object):
       #    this reliant on the alarm service though isn't justified for this
       #    tool and we should stick with usingsimulation output.
       #
-      #    From Dec 13 meeting with Andy, he advised using the intial Y-bus
+      #    DONE From Dec 13 meeting with Andy, he advised using the intial Y-bus
       #    that's determined from the Model Validator CIM Y-bus code to use as
       #    the basis for initial values for both switches and tap positions.
       #    For switches at least, this seems doable.  I can look at the Y-bus
@@ -181,7 +180,9 @@ class SimWrapper(object):
       #    values.  Andy suggested if the values indicate a closed switch, but
       #    says it's -1000 instead of -500, that I update it to be -500.  This
       #    would only be at the start though and maybe never if I use the MV
-      #    CIM code.  I'm still not sure how this would work with regulator tap
+      #    CIM code.
+
+      #    I'm still not sure how this would work with regulator tap
       #    positions so code it for switches first to figure out the
       #    implications for tap positions and whether I need to ask some
       #    questions.
@@ -209,20 +210,7 @@ class SimWrapper(object):
           value = msgdict['measurements'][mrid]['value']
           noderow = self.SwitchMridToNode[mrid]
           print('Found switch mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
-          if value == 1:
-            if not checkSwitchClosed(noderow):
-              self.Ybus[noderow][noderow] = switchClosedValue
-              if noderow not in YbusChanges:
-                YbusChanges[noderow] = {}
-              YbusChanges[noderow][noderow] = switchClosedValue
-
-              # TODO Figure out if the nodes in the same row need to be updated
-              # to decide whether the logic below is needed
-              for nodecol in self.Ybus[noderow]:
-                if nodecol != noderow:
-                  self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
-                  YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
-          elif value == 0:
+          if value == 0: # open
             if not checkSwitchOpen(noderow):
               self.Ybus[noderow][noderow] = switchOpenValue
               if noderow not in YbusChanges:
@@ -231,10 +219,30 @@ class SimWrapper(object):
 
               # TODO Figure out if the nodes in the same row need to be updated
               # to decide whether the logic below is needed
-              for nodecol in self.Ybus[noderow]:
-                if nodecol != noderow:
-                  self.Ybus[noderow][nodecol] = switchOpenValue
-                  YbusChanges[noderow][nodecol] = switchOpenValue
+              # If it is, I can eliminate the 4 lines above because this will
+              # also update Ybus[noderow][noderow]
+              #for nodecol in self.Ybus[noderow]:
+              #  self.Ybus[noderow][nodecol] = switchOpenValue
+              #  if noderow not in YbusChanges:
+              #    YbusChanges[noderow] = {}
+              #  YbusChanges[noderow][nodecol] = switchOpenValue
+
+          else: # closed
+            if not checkSwitchClosed(noderow):
+              self.Ybus[noderow][noderow] = switchClosedValue
+              if noderow not in YbusChanges:
+                YbusChanges[noderow] = {}
+              YbusChanges[noderow][noderow] = switchClosedValue
+
+              # TODO Figure out if the nodes in the same row need to be updated
+              # to decide whether the logic below is needed and, if so, whether
+              # resetting to the original value is the right logic.  Seems like
+              # this could lead to issues if the other nodes are transformers
+              # or switches themselves
+              #for nodecol in self.Ybus[noderow]:
+              #  if nodecol != noderow:
+              #    self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
+              #    YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
 
         except:
           if mrid not in msgdict['measurements']:
