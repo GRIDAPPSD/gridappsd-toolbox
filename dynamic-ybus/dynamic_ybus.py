@@ -74,6 +74,16 @@ class SimWrapper(object):
     return self.keepLoopingFlag
 
 
+  def checkSwitchClosed(self, noderow):
+    Yval = self.Ybus[noderow][noderow].real
+    return (Yval>=-1000.0 and Yval<=-500.0)
+
+
+  def checkSwitchOpen(self, noderow):
+    Yval = self.Ybus[noderow][noderow].real
+    return (abs(Yval) <= 0.001)
+
+
   def on_message(self, header, message):
     # TODO workaround for broken unsubscribe method
     if not self.keepLoopingFlag:
@@ -188,8 +198,8 @@ class SimWrapper(object):
       #      back to consider a separate Y-bus per feeder and island.  This
       #      version might need to be topology processor aware.
 
-      changedFlag = False
       YbusChanges = {}
+      # Check if there are any entries in YbusChanges to see if anything changed
 
       switchOpenValue = complex(0,0)
       switchClosedValue = complex(-500,500)
@@ -199,35 +209,32 @@ class SimWrapper(object):
           value = msgdict['measurements'][mrid]['value']
           noderow = self.SwitchMridToNode[mrid]
           print('Found switch mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
-          if noderow not in self.LastValue: # NOTE: this will go away
-            # just set last value to the current value and call it good
-            self.LastValue[noderow] = value
-            # DEBUG START
-            print('Switch initial value for node: ' + noderow + ', value: ' + str(value), flush=True)
-            for nodecol in self.Ybus[noderow]:
-              print('Switch initial Ybus value for row: ' + noderow + ', col: ' + nodecol + ', value: ' + str(self.Ybus[noderow][nodecol]), flush=True)
-            # DEBUG FINISH
-          elif value != self.LastValue[noderow]:
-            changedFlag = True
-            print('Switch value changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
-            self.LastValue[noderow] = value # update last value with current value
+          if value == 1:
+            if not checkSwitchClosed(noderow):
+              self.Ybus[noderow][noderow] = switchClosedValue
+              if noderow not in YbusChanges:
+                YbusChanges[noderow] = {}
+              YbusChanges[noderow][noderow] = switchClosedValue
 
-            if noderow not in YbusChanges:
-              YbusChanges[noderow] = {}
-
-            # check whether the switch is now open or closed and update accordingly
-            if value == 0: # now open, hardwire admittance
+              # TODO Figure out if the nodes in the same row need to be updated
+              # to decide whether the logic below is needed
               for nodecol in self.Ybus[noderow]:
-                self.Ybus[noderow][nodecol] = switchOpenValue
-                YbusChanges[noderow][nodecol] = switchOpenValue
+                if nodecol != noderow:
+                  self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
+                  YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
+          elif value == 0:
+            if not checkSwitchOpen(noderow):
+              self.Ybus[noderow][noderow] = switchOpenValue
+              if noderow not in YbusChanges:
+                YbusChanges[noderow] = {}
+              YbusChanges[noderow][noderow] = switchOpenValue
 
-            else: # now closed, restore admittance to original value
+              # TODO Figure out if the nodes in the same row need to be updated
+              # to decide whether the logic below is needed
               for nodecol in self.Ybus[noderow]:
-                self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
-                YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
-
-          #else:
-          #  print('Switch value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
+                if nodecol != noderow:
+                  self.Ybus[noderow][nodecol] = switchOpenValue
+                  YbusChanges[noderow][nodecol] = switchOpenValue
 
         except:
           if mrid not in msgdict['measurements']:
@@ -278,10 +285,10 @@ class SimWrapper(object):
           else:
             print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
-      if changedFlag:
-        print('changedFlag set so I will publish full Ybus and minimal YbusChanges', flush=True)
+      if len(YbusChanges) > 0:
+        print('*** Ybus changed so I will publish full Ybus and minimal YbusChanges!', flush=True)
       else:
-        print('changedFlag NOT set so nothing to do', flush=True)
+        print('Ybus NOT changed so nothing to do', flush=True)
 
 
 def nodes_to_watch(sparql_mgr):
