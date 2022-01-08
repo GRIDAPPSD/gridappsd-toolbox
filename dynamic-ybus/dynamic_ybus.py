@@ -58,15 +58,15 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode):
+  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode, TransformerOrigPos, TransformerLastPos):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.Ybus = Ybus
     self.YbusOrig = YbusOrig
     self.SwitchMridToNode = SwitchMridToNode
     self.TransformerMridToNode = TransformerMridToNode
-    self.LastValue = {}
-    self.OrigTapPos = {}
+    self.TransformerOrigPos = TransformerOrigPos
+    self.TransformerLastPos = TransformerLastPos
     self.keepLoopingFlag = True
 
 
@@ -252,16 +252,17 @@ class SimWrapper(object):
           else:
             print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
-      # START HERE
       # For transformers I think I should start by assuming tap position is 0
-      # and saving away the original value for this.  If this isn't the case
-      # then hopefully I can devise a query to get the starting position or
-      # somehow calculate it.  Anyway, with this some of my existing logic
-      # below will be useful to get the new values and at least for transformers
-      # I do know I need to update the other columns for the row
+      # and saving away the original value for this, which I already have in
+      # YbusOrig.
+      # If this isn't the case, then hopefully I can devise a query to get the
+      # starting position or somehow calculate it.
+      # Anyway, with this some of my existing logic below
+      # will be useful to get the new values and at least for transformers
+      # I do know I need to update the other columns for the row.
       # Either save away the initial tap position number so I can use that in
       # my calcuation to update the value or I could "normalize" the original
-      # Ybus values to figuring out what it would be for position 0 and set
+      # Ybus values by figuring out what it would be for position 0 and set
       # that as the original Ybus value so I don't need to bring the original
       # tap position number into the calculation
 
@@ -270,33 +271,28 @@ class SimWrapper(object):
           value = msgdict['measurements'][mrid]['value']
           noderow = self.TransformerMridToNode[mrid]
           print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
-          if noderow not in self.LastValue:
-            # set last value to the current value and save the original tap position
-            # to determine the admittance multiplier
-            self.LastValue[noderow] = self.OrigTapPos[noderow] = value
-          elif value != self.LastValue[noderow]:
-            changedFlag = True
-            print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
-            self.LastValue[noderow] = value # update last value with current value
+          if value != self.TransformerLastPos[noderow]:
+            print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
+            self.TransformerLastPos[noderow] = value
 
             if noderow not in YbusChanges:
               YbusChanges[noderow] = {}
 
             # calculate the admittance multiplier based on the change in the tap
             # position vs. the original position
-            tapPosMultiplier = 1.0 + (value - self.OrigTapPos[noderow])*0.0625
+            posMultiplier = 1.0 + (value - self.TransformerOrigPos[noderow])*0.0625
 
             # update Ybus based on the multiplier
             for nodecol in self.Ybus[noderow]:
-              self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol] * tapPosMultiplier
-              YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol] * tapPosMultiplier
+              self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol] * posMultiplier
+              YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol] * posMultiplier
 
             # for the diagonal element square the multiplier for YbusOrig
-            self.Ybus[noderow][noderow] = self.YbusOrig[noderow][noderow] * tapPosMultiplier**2
-            YbusChanges[noderow][noderow] = self.YbusOrig[noderow][noderow] * tapPosMultiplier**2
+            self.Ybus[noderow][noderow] = self.YbusOrig[noderow][noderow] * posMultiplier**2
+            YbusChanges[noderow][noderow] = self.YbusOrig[noderow][noderow] * posMultiplier**2
 
           #else:
-          #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.LastValue[noderow]) + ', new value: ' + str(value), flush=True)
+          #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
 
         except:
           if mrid not in msgdict['measurements']:
@@ -319,6 +315,8 @@ def nodes_to_watch(sparql_mgr):
 
     SwitchMridToNode = {}
     TransformerMridToNode = {}
+    TransformerOrigPos = {}
+    TransformerLastPos = {}
     for feeder in feeders:
         for meas in feeder['measurements']:
             # Pos measurement type includes both switches and regulators
@@ -329,8 +327,10 @@ def nodes_to_watch(sparql_mgr):
                   print('Switch mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
                 elif meas['ConductingEquipment_type'] == 'PowerTransformer':
                   node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
-                  TransformerMridToNode[meas['mRID']] = node.upper()
-                  print('Transformer mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
+                  node = node.upper()
+                  TransformerMridToNode[meas['mRID']] = node
+                  print('Transformer mrid: ' + meas['mRID'] + ', node: ' + node, flush=True)
+                  TransformerOrigPos[node] = TransformerLastPos[node] = 0
                 # TODO: Handle LinearShuntCompensator?
                 #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
 
@@ -339,7 +339,7 @@ def nodes_to_watch(sparql_mgr):
     print('Transformers:', flush=True)
     pprint.pprint(TransformerMridToNode)
 
-    return SwitchMridToNode,TransformerMridToNode
+    return SwitchMridToNode,TransformerMridToNode, TransformerOrigPos, TransformerLastPos
 
 
 def opendss_ybus(sparql_mgr):
@@ -417,7 +417,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
   sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-  SwitchMridToNode,TransformerMridToNode = nodes_to_watch(sparql_mgr)
+  SwitchMridToNode,TransformerMridToNode,TranformerOrigPos,TransformerLastPos = nodes_to_watch(sparql_mgr)
 
   # Get starting Ybus from static_ybus module
   mod_import = importlib.import_module('static-ybus.static_ybus')
@@ -435,7 +435,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   YbusOrig = ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode)
   #YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode)
+  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode, TransformerOrigPos, TransformerLastPos)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
