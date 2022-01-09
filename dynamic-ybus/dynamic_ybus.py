@@ -226,7 +226,8 @@ class SimWrapper(object):
               # Endpoints are determined by SPARQL query that is run before
               # processing simulation output to populate a lookup table
               self.Ybus[nodes[0]][nodes[1]] = switchOpenValue
-              # Make sure ind(endpoint1) < ind(endpoint2)
+              # Make sure ind(endpoint1) >= ind(endpoint2) so we are only
+              # working with the lower diagonal elements
               # Modify diagnonal terms for both endpoints
               self.Ybus[nodes[0]][nodes[0]] -= switchClosedValue
               self.Ybus[nodes[1]][nodes[1]] -= switchClosedValue
