@@ -58,12 +58,12 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode, TransformerOrigPos, TransformerLastPos):
+  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNodes, TransformerMridToNode, TransformerOrigPos, TransformerLastPos):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.Ybus = Ybus
     self.YbusOrig = YbusOrig
-    self.SwitchMridToNode = SwitchMridToNode
+    self.SwitchMridToNodes = SwitchMridToNodes
     self.TransformerMridToNode = TransformerMridToNode
     self.TransformerOrigPos = TransformerOrigPos
     self.TransformerLastPos = TransformerLastPos
@@ -74,14 +74,20 @@ class SimWrapper(object):
     return self.keepLoopingFlag
 
 
-  def checkSwitchOpen(self, noderow):
-    Yval = self.Ybus[noderow][noderow].real
-    return (abs(Yval) <= 0.001)
+  def checkSwitchOpen(self, nodes):
+    try:
+      Yval = self.Ybus[nodes[0]][nodes[1]].real
+      return (abs(Yval) <= 0.001)
+    except:
+      return True
 
 
-  def checkSwitchClosed(self, noderow):
-    Yval = self.Ybus[noderow][noderow].real
-    return (Yval>=-1000.0 and Yval<=-500.0)
+  def checkSwitchClosed(self, nodes):
+    try:
+      Yval = self.Ybus[nodes[0]][nodes[1]].real
+      return (Yval>=-1000.0 and Yval<=-500.0)
+    except:
+      return False
 
 
   def on_message(self, header, message):
@@ -205,44 +211,51 @@ class SimWrapper(object):
       switchOpenValue = complex(0,0)
       switchClosedValue = complex(-500,500)
 
-      for mrid in self.SwitchMridToNode:
+      for mrid in self.SwitchMridToNodes:
         try:
           value = msgdict['measurements'][mrid]['value']
-          noderow = self.SwitchMridToNode[mrid]
-          print('Found switch mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+          nodes = self.SwitchMridToNodes[mrid]
+          print('Found switch mrid: ' + mrid + ', nodes: ' + str(nodes) + ', value: ' + str(value), flush=True)
           if value == 0: # open
-            if not checkSwitchOpen(noderow):
-              self.Ybus[noderow][noderow] = switchOpenValue
-              if noderow not in YbusChanges:
-                YbusChanges[noderow] = {}
-              YbusChanges[noderow][noderow] = switchOpenValue
+            if not self.checkSwitchOpen(nodes):
+              # New guidance from Andy:  Must figure out the elements to
+              # change based off a query, not directly use the
+              # Ybus[noderow][noderow] entry
+              # Set off-diagonal element corresponding to the intersection
+              # of the two endpoints of the switch to "switchOpenValue"
+              # Endpoints are determined by SPARQL query that is run before
+              # processing simulation output to populate a lookup table
+              self.Ybus[nodes[0]][nodes[1]] = switchOpenValue
+              # Make sure ind(endpoint1) < ind(endpoint2)
+              # Modify diagnonal terms for both endpoints
+              self.Ybus[nodes[0]][nodes[0]] -= switchClosedValue
+              self.Ybus[nodes[1]][nodes[1]] -= switchClosedValue
 
-              # TODO Figure out if the nodes in the same row need to be updated
-              # to decide whether the logic below is needed
-              # If it is, I can eliminate the 4 lines above because this will
-              # also update Ybus[noderow][noderow]
-              #for nodecol in self.Ybus[noderow]:
-              #  self.Ybus[noderow][nodecol] = switchOpenValue
-              #  if noderow not in YbusChanges:
-              #    YbusChanges[noderow] = {}
-              #  YbusChanges[noderow][nodecol] = switchOpenValue
+              if nodes[0] not in YbusChanges:
+                YbusChanges[nodes[0]] = {}
+              YbusChanges[nodes[0]][nodes[1]] = switchOpenValue
+              YbusChanges[nodes[0]][nodes[0]] -= switchClosedValue
+              if nodes[1] not in YbusChanges:
+                YbusChanges[nodes[1]] = {}
+              YbusChanges[nodes[1]][nodes[1]] -= switchClosedValue
 
           else: # closed
-            if not checkSwitchClosed(noderow):
-              self.Ybus[noderow][noderow] = switchClosedValue
-              if noderow not in YbusChanges:
-                YbusChanges[noderow] = {}
-              YbusChanges[noderow][noderow] = switchClosedValue
+            if not self.checkSwitchClosed(nodes):
+              self.Ybus[nodes[0]][nodes[1]] = switchClosedValue
+              self.Ybus[nodes[0]][nodes[0]] += switchClosedValue
+              self.Ybus[nodes[1]][nodes[1]] += switchClosedValue
 
-              # TODO Figure out if the nodes in the same row need to be updated
-              # to decide whether the logic below is needed and, if so, whether
-              # resetting to the original value is the right logic.  Seems like
-              # this could lead to issues if the other nodes are transformers
-              # or switches themselves
-              #for nodecol in self.Ybus[noderow]:
-              #  if nodecol != noderow:
-              #    self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
-              #    YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol]
+              if nodes[0] not in YbusChanges:
+                YbusChanges[nodes[0]] = {}
+              YbusChanges[nodes[0]][nodes[1]] = switchClosedValue
+              if nodes[0] not in YbusChanges[nodes[0]]:
+                YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
+              YbusChanges[nodes[0]][nodes[0]] += switchClosedValue
+              if nodes[1] not in YbusChanges:
+                YbusChanges[nodes[1]] = {}
+              if nodes[1] not in YbusChanges[nodes[1]]:
+                YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
+              YbusChanges[nodes[1]][nodes[1]] += switchClosedValue
 
         except:
           if mrid not in msgdict['measurements']:
@@ -308,38 +321,54 @@ class SimWrapper(object):
         print('Ybus NOT changed so nothing to do', flush=True)
 
 
-def nodes_to_watch(sparql_mgr):
+def nodes_to_update(sparql_mgr):
+    bindings = sparql_mgr.SwitchingEquipment_switch_names()
+
+    switchToBuses = {}
+    for obj in bindings:
+      sw_name = obj['sw_name']['value']
+      bus1 = obj['bus1']['value'].upper()
+      bus2 = obj['bus2']['value'].upper()
+      switchToBuses[sw_name] = [bus1, bus2]
+
     feeders = sparql_mgr.cim_export()
 
     phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
 
-    SwitchMridToNode = {}
+    SwitchMridToNodes = {}
     TransformerMridToNode = {}
     TransformerOrigPos = {}
     TransformerLastPos = {}
     for feeder in feeders:
-        for meas in feeder['measurements']:
-            # Pos measurement type includes both switches and regulators
-            if meas['measurementType'] == 'Pos':
-                if meas['ConductingEquipment_type'] == 'LoadBreakSwitch':
-                  node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
-                  SwitchMridToNode[meas['mRID']] = node.upper()
-                  print('Switch mrid: ' + meas['mRID'] + ', node: ' + node.upper(), flush=True)
-                elif meas['ConductingEquipment_type'] == 'PowerTransformer':
-                  node = meas['ConnectivityNode'] + phaseToIdx[meas['phases']]
-                  node = node.upper()
-                  TransformerMridToNode[meas['mRID']] = node
-                  print('Transformer mrid: ' + meas['mRID'] + ', node: ' + node, flush=True)
-                  TransformerOrigPos[node] = TransformerLastPos[node] = 0
-                # TODO: Handle LinearShuntCompensator?
-                #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
+      for meas in feeder['measurements']:
+        # Pos measurement type includes both switches and regulators
+        if meas['measurementType'] == 'Pos':
+          mrid = meas['mRID']
+          phase = meas['phases']
+          if meas['ConductingEquipment_type'] == 'LoadBreakSwitch':
+            sw_name = meas['ConductingEquipment_name']
+            if sw_name in switchToBuses:
+              buses = switchToBuses[sw_name]
+              node1 = buses[0] + phaseToIdx[phase]
+              node2 = buses[1] + phaseToIdx[phase]
+              SwitchMridToNodes[mrid] = [node1, node2]
+              print('Switch mrid: ' + mrid + ', nodes: ' + str(SwitchMridToNodes[mrid]), flush=True)
+              print(meas)
+          elif meas['ConductingEquipment_type'] == 'PowerTransformer':
+            node = meas['ConnectivityNode'] + phaseToIdx[phase]
+            node = node.upper()
+            TransformerMridToNode[mrid] = node
+            print('Transformer mrid: ' + mrid + ', node: ' + node, flush=True)
+            TransformerOrigPos[node] = TransformerLastPos[node] = 0
+          # TODO: Handle LinearShuntCompensator?
+          #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
 
     print('Switches:', flush=True)
-    pprint.pprint(SwitchMridToNode)
+    pprint.pprint(SwitchMridToNodes)
     print('Transformers:', flush=True)
     pprint.pprint(TransformerMridToNode)
 
-    return SwitchMridToNode,TransformerMridToNode, TransformerOrigPos, TransformerLastPos
+    return SwitchMridToNodes,TransformerMridToNode, TransformerOrigPos, TransformerLastPos
 
 
 def opendss_ybus(sparql_mgr):
@@ -363,32 +392,6 @@ def opendss_ybus(sparql_mgr):
   pprint.pprint(Ybus)
 
   return Ybus
-
-
-def ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode):
-  YbusOrig = {}
-
-  for noderow in SwitchMridToNode.values():
-    if noderow not in YbusOrig:
-      YbusOrig[noderow] = {}
-
-    for nodecol,value in Ybus[noderow].items():
-      # could store the value with row and col reversed as well, but don't
-      # currently need it
-      YbusOrig[noderow][nodecol] = value
-
-  for noderow in TransformerMridToNode.values():
-    if noderow not in YbusOrig:
-      YbusOrig[noderow] = {}
-
-    for nodecol,value in Ybus[noderow].items():
-      # could store the value with row and col reversed as well, but don't
-      # currently need it
-      YbusOrig[noderow][nodecol] = value
-
-  #pprint.pprint(YbusOrig)
-
-  return YbusOrig
 
 
 def ybus_save_original_xfmrs(Ybus, TransformerMridToNode):
@@ -417,7 +420,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
   sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-  SwitchMridToNode,TransformerMridToNode,TranformerOrigPos,TransformerLastPos = nodes_to_watch(sparql_mgr)
+  SwitchMridToNodes,TransformerMridToNode,TransformerOrigPos,TransformerLastPos = nodes_to_update(sparql_mgr)
 
   # Get starting Ybus from static_ybus module
   mod_import = importlib.import_module('static-ybus.static_ybus')
@@ -432,10 +435,9 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   # TODO use first version if admittances will be changed for nodes in the
   # same Ybus row of a switch will be changed and second call if only the
   # switch node itself will be changed
-  YbusOrig = ybus_save_original(Ybus, SwitchMridToNode, TransformerMridToNode)
-  #YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
+  YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNode, TransformerMridToNode, TransformerOrigPos, TransformerLastPos)
+  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNodes, TransformerMridToNode, TransformerOrigPos, TransformerLastPos)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
