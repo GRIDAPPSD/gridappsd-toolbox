@@ -225,7 +225,7 @@ class SimWrapper(object):
               # of the two endpoints of the switch to "switchOpenValue"
               # Endpoints are determined by SPARQL query that is run before
               # processing simulation output to populate a lookup table
-              self.Ybus[nodes[0]][nodes[1]] = switchOpenValue
+              self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchOpenValue
               # Make sure ind(endpoint1) >= ind(endpoint2) so we are only
               # working with the lower diagonal elements
               # Modify diagnonal terms for both endpoints
@@ -234,27 +234,29 @@ class SimWrapper(object):
 
               if nodes[0] not in YbusChanges:
                 YbusChanges[nodes[0]] = {}
-              YbusChanges[nodes[0]][nodes[1]] = switchOpenValue
-              YbusChanges[nodes[0]][nodes[0]] -= switchClosedValue
               if nodes[1] not in YbusChanges:
                 YbusChanges[nodes[1]] = {}
+              YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchOpenValue
+              YbusChanges[nodes[0]][nodes[0]] -= switchClosedValue
               YbusChanges[nodes[1]][nodes[1]] -= switchClosedValue
 
           else: # closed
             if not self.checkSwitchClosed(nodes):
               print('Switch value changed from open to closed based on existing Ybus', flush=True)
-              self.Ybus[nodes[0]][nodes[1]] = switchClosedValue
+              self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchClosedValue
               self.Ybus[nodes[0]][nodes[0]] += switchClosedValue
               self.Ybus[nodes[1]][nodes[1]] += switchClosedValue
 
               if nodes[0] not in YbusChanges:
                 YbusChanges[nodes[0]] = {}
-              YbusChanges[nodes[0]][nodes[1]] = switchClosedValue
+              if nodes[1] not in YbusChanges:
+                YbusChanges[nodes[1]] = {}
+              YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchClosedValue
+
               if nodes[0] not in YbusChanges[nodes[0]]:
                 YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
               YbusChanges[nodes[0]][nodes[0]] += switchClosedValue
-              if nodes[1] not in YbusChanges:
-                YbusChanges[nodes[1]] = {}
+
               if nodes[1] not in YbusChanges[nodes[1]]:
                 YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
               YbusChanges[nodes[1]][nodes[1]] += switchClosedValue
@@ -299,12 +301,16 @@ class SimWrapper(object):
 
             # update Ybus based on the multiplier
             for nodecol in self.Ybus[noderow]:
-              self.Ybus[noderow][nodecol] = self.YbusOrig[noderow][nodecol] * posMultiplier
-              YbusChanges[noderow][nodecol] = self.YbusOrig[noderow][nodecol] * posMultiplier
+              Yval = self.YbusOrig[noderow][nodecol] * posMultiplier
+              self.Ybus[noderow][nodecol] = self.Ybus[nodecol][noderow] = Yval
+              if nodecol not in YbusChanges:
+                YbusChanges[nodecol] = {}
+              YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = Yval
 
             # for the diagonal element square the multiplier for YbusOrig
-            self.Ybus[noderow][noderow] = self.YbusOrig[noderow][noderow] * posMultiplier**2
-            YbusChanges[noderow][noderow] = self.YbusOrig[noderow][noderow] * posMultiplier**2
+            Yval = self.YbusOrig[noderow][nodecol] * posMultiplier**2
+            self.Ybus[noderow][noderow] = Yval
+            YbusChanges[noderow][noderow] = Yval
 
           #else:
           #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
@@ -389,7 +395,9 @@ def opendss_ybus(sparql_mgr):
       continue
     if Nodes[int(items[0])] not in Ybus:
       Ybus[Nodes[int(items[0])]] = {}
-    Ybus[Nodes[int(items[0])]][Nodes[int(items[1])]] = complex(float(items[2]), float(items[3]))
+    if Nodes[int(items[1])] not in Ybus:
+      Ybus[Nodes[int(items[1])]] = {}
+    Ybus[Nodes[int(items[0])]][Nodes[int(items[1])]] = Ybus[Nodes[int(items[1])]][Nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
   pprint.pprint(Ybus)
 
   return Ybus
@@ -403,8 +411,6 @@ def ybus_save_original_xfmrs(Ybus, TransformerMridToNode):
       YbusOrig[noderow] = {}
 
     for nodecol,value in Ybus[noderow].items():
-      # could store the value with row and col reversed as well, but don't
-      # currently need it
       YbusOrig[noderow][nodecol] = value
 
   #pprint.pprint(YbusOrig)
@@ -431,11 +437,8 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   #Ybus = opendss_ybus(sparql_mgr)
 
   # Save the starting Ybus values for all the entries that could change based
-  # on switch and transformer value changes (no reason to save the values that
+  # on transformer value changes (no reason to save the values that
   # will never change)
-  # TODO use first version if admittances will be changed for nodes in the
-  # same Ybus row of a switch will be changed and second call if only the
-  # switch node itself will be changed
   YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
 
   simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos)
