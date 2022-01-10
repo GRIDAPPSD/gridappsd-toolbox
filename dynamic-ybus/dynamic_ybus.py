@@ -105,129 +105,58 @@ class SimWrapper(object):
       ts = msgdict['timestamp']
       print('simulation timestamp: ' + str(ts), flush=True)
 
-      # Ybus processing workflow:
-      # 1. Iterate over all switch and transformer mrids
-      # 2. Determine if the measurement value has changed since the last measurement.
-      #    If so:
-      # 3. Set a flag to indicate that a new Ybus message will be published
-      # 4. Iterate over all Ybus entries for the row of the node for the
-      #    mrid, updating values
-      # 5. For tap changes, the value multiplier for entries is the
-      #    tap position ratio.  Come back and apply the multiplier a 2nd time for
-      #    the diagonal entry so it is squared
-      # 6. For switch changes, a closed switch should restore the starting Ybus
-      #    values and an open switch should set them to (-500,500)
-      # 7. After all switch and transformer mrids are processed, if the change flag
-      #    is set, publish updated Ybus sending separate messages for the full Ybus
-      #    (maybe just lower diagonal) and just for changed elements
-
       # Questions:
-      # 1. HOLD Do I need to process changes to LinearShuntCompensator conducting
+      # 1. HOLD Do I need to process changes to LinearShuntCompensator
       #    equipment? Ans: Yes, need guidance from Andy. Alex said I could
       #    get a CIM dictionary value to plug into the diagonal element and this
       #    would be the extent of what to change. Not sure how this relates to
       #    new values coming from simulation output.
 
-      # 2. DONE Should I keep track of and publish the full Ybus or just the
+      # 2. HOLD Should I keep publish the full Ybus or just the
       #    lower diagonal elements (same for YbusChanges)? Ans: Just lower diag
 
-      # 3. DONE Do we need to keep/publish an index number based version of Ybus
+      # 3. HOLD Do we need to publish an index number based version of Ybus
       #    vs. just the node name based version? Ans:  Don't think so as index
-      #    is just an artifact of the node list order and not meaningful
+      #    is just an artifact of the node list order and not meaningful.
+      #    Shiva thinks I should publish an index based version so need to
+      #    combe back to this
 
       # 4. HOLD Should the ActiveMQ message format for Ybus just be the "sparse"
       #    dictionary of dictionaries? Ans: Yes
 
-      # 5. HOLD Should the real and imaginary components of complex Ybus values be
-      #    given as two separate floating point values in the published message
+      # 5. HOLD Should the real and imaginary components of complex Ybus values
+      #    be two separate floating point values in the published message
       #    instead of some complex number representation? Ans: If JSON directly
       #    supports complex number representation vs. some ugly string
       #    conversion then do it as complex.  Otherwise, separate the
       #    components into floats. Based on googling, it looks like JSON has
       #    no direct support for complex numbers so need to separate components
 
-      # 6. Need verification of what I'm updating in Ybus and if the values I'm
-      #    updating to are correct for switches and transformers.  Ans:  Need
-      #    lots of guidance from Andy to straighten out what do to both for
-      #    switches and transformers.
+      # 7. HOLD Andy talked about creating a separate Ybus for each feeder and
+      #    island.  Right now I have only a monolithic Ybus so need to come
+      #    back and get more guidance on this.  Perhaps this is related to
+      #    making dynamic YBus aware of Topology Processor as I'm not sure
+      #    of the need for this otherwise
 
-      # 7. Aren't I missing at least updates to impacted nodes from switch state
-      #    changes by only processing the Ybus row and not using Top Processor
-      #    for keeping track of what nodes are controlled by a switch?  Doesn't
-      #    just updating the same Ybus row only get the direct connections to
-      #    the switch node where it could deenergize much beyond that?
-      #    Ans: Yes, need TP awareness eventually.  Andy talked about creating
-      #    a separate Y-bus for each feeder and island. Need more guidance.
-
-      # 8. Is my approach of initializing the switch states and tap positions
-      #    based on the first simulation output message legitimate or do I
-      #    really need another way to do this?  For switches, I assume this
-      #    would be that all switches start closed, but not sure on regulator
-      #    tap positions.  Ans: tap positions all start at zero so I need one
-      #    published Y-bus message just to establish the initial state even
-      #    though it's not a change per se. Also, for open switches insert
-      #    (0,0), closed is (-500,500)
-      #
-      #    DONE Poorva thinks it would be better to use the alarm service than
-      #    determining changes from simulation output.  She said that the new
-      #    switch state is part of the alarm message and that if tap position
-      #    wasn't already, it could be easily added.  Andy thinks that being
-      #    this reliant on the alarm service though isn't justified for this
-      #    tool and we should stick with usingsimulation output.
-      #
-      #    DONE From Dec 13 meeting with Andy, he advised using the intial Y-bus
-      #    that's determined from the Model Validator CIM Y-bus code to use as
-      #    the basis for initial values for both switches and tap positions.
-      #    For switches at least, this seems doable.  I can look at the Y-bus
-      #    value to determine if the switch starts out open or closed based on
-      #    the value.  Then I can continue to do this instead of keeping a
-      #    "last value" dictionary to determine when I need to update Y-bus
-      #    values.  Andy suggested if the values indicate a closed switch, but
-      #    says it's -1000 instead of -500, that I update it to be -500.  This
-      #    would only be at the start though and maybe never if I use the MV
-      #    CIM code.
-
-      #    I'm still not sure how this would work with regulator tap
-      #    positions so code it for switches first to figure out the
-      #    implications for tap positions and whether I need to ask some
-      #    questions.
-      #
-      #    Other Andy guidance:
-      #    * DONE Use try/except instead of checking 'value' in measurement.
-      #      Also, it's not guaranteed that the mrid will exist either and this
-      #      will catch that
-      #    * My LastValue logic will go away and I can hopefully always use the
-      #      same logic to determine changes both the first time through and
-      #      after that.  Andy did figure out we'd need a last tap position
-      #      though so this is not the same for regulators.
-      #    * Get this working first for a monolithic Y-bus and then later come
-      #      back to consider a separate Y-bus per feeder and island.  This
-      #      version might need to be topology processor aware.
-
-      YbusChanges = {}
-      # Check if there are any entries in YbusChanges to see if anything changed
+      # 8. DONE Use try/except instead of checking 'value' in measurement.
+      #    Also, it's not guaranteed that the mrid will exist either and this
+      #    will catch that
 
       switchOpenValue = complex(0,0)
       switchClosedValue = complex(-500,500)
 
+      YbusChanges = {} # minimal set of Ybus changes for timestamp
+
+      # Switch processing
       for mrid in self.SwitchMridToNodes:
         try:
           value = msgdict['measurements'][mrid]['value']
-          nodes = self.SwitchMridToNodes[mrid]
+          nodes = self.SwitchMridToNodes[mrid] # two endpoints for switch
           print('Found switch mrid: ' + mrid + ', nodes: ' + str(nodes) + ', value: ' + str(value), flush=True)
           if value == 0: # open
             if not self.checkSwitchOpen(nodes):
               print('Switch value changed from closed to open based on existing Ybus', flush=True)
-              # New guidance from Andy:  Must figure out the elements to
-              # change based off a query, not directly use the
-              # Ybus[noderow][noderow] entry
-              # Set off-diagonal element corresponding to the intersection
-              # of the two endpoints of the switch to "switchOpenValue"
-              # Endpoints are determined by SPARQL query that is run before
-              # processing simulation output to populate a lookup table
               self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchOpenValue
-              # Make sure ind(endpoint1) >= ind(endpoint2) so we are only
-              # working with the lower diagonal elements
               # Modify diagnonal terms for both endpoints
               self.Ybus[nodes[0]][nodes[0]] -= switchClosedValue
               self.Ybus[nodes[1]][nodes[1]] -= switchClosedValue
@@ -269,20 +198,7 @@ class SimWrapper(object):
           else:
             print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
-      # For transformers I think I should start by assuming tap position is 0
-      # and saving away the original value for this, which I already have in
-      # YbusOrig.
-      # If this isn't the case, then hopefully I can devise a query to get the
-      # starting position or somehow calculate it.
-      # Anyway, with this some of my existing logic below
-      # will be useful to get the new values and at least for transformers
-      # I do know I need to update the other columns for the row.
-      # Either save away the initial tap position number so I can use that in
-      # my calcuation to update the value or I could "normalize" the original
-      # Ybus values by figuring out what it would be for position 0 and set
-      # that as the original Ybus value so I don't need to bring the original
-      # tap position number into the calculation
-
+      # Transformer processing
       for mrid in self.TransformerMridToNode:
         try:
           value = msgdict['measurements'][mrid]['value']
@@ -323,10 +239,10 @@ class SimWrapper(object):
           else:
             print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
-      if len(YbusChanges) > 0:
+      if len(YbusChanges) > 0: # Ybus changed if there are any entries here
         print('*** Ybus changed so I will publish full Ybus and minimal YbusChanges!', flush=True)
       else:
-        print('Ybus NOT changed so nothing to do', flush=True)
+        print('Ybus NOT changed so nothing to do here', flush=True)
 
 
 def nodes_to_update(sparql_mgr):
@@ -360,20 +276,19 @@ def nodes_to_update(sparql_mgr):
               node2 = buses[1] + phaseToIdx[phase]
               SwitchMridToNodes[mrid] = [node1, node2]
               print('Switch mrid: ' + mrid + ', nodes: ' + str(SwitchMridToNodes[mrid]), flush=True)
-              print(meas)
           elif meas['ConductingEquipment_type'] == 'PowerTransformer':
             node = meas['ConnectivityNode'] + phaseToIdx[phase]
             node = node.upper()
             TransformerMridToNode[mrid] = node
-            print('Transformer mrid: ' + mrid + ', node: ' + node, flush=True)
             TransformerLastPos[node] = 0
+            print('Transformer mrid: ' + mrid + ', node: ' + node, flush=True)
           # TODO: Handle LinearShuntCompensator?
           #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
 
-    print('Switches:', flush=True)
-    pprint.pprint(SwitchMridToNodes)
-    print('Transformers:', flush=True)
-    pprint.pprint(TransformerMridToNode)
+    #print('Switches:', flush=True)
+    #pprint.pprint(SwitchMridToNodes)
+    #print('Transformers:', flush=True)
+    #pprint.pprint(TransformerMridToNode)
 
     return SwitchMridToNodes,TransformerMridToNode,TransformerLastPos
 
@@ -411,6 +326,8 @@ def ybus_save_original_xfmrs(Ybus, TransformerMridToNode):
       YbusOrig[noderow] = {}
 
     for nodecol,value in Ybus[noderow].items():
+      # No need to reverse nodes for full Ybus because we are iterating over
+      # all elements of a full Ybus
       YbusOrig[noderow][nodecol] = value
 
   #pprint.pprint(YbusOrig)
@@ -437,7 +354,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   #Ybus = opendss_ybus(sparql_mgr)
 
   # Save the starting Ybus values for all the entries that could change based
-  # on transformer value changes (no reason to save the values that
+  # on transformer value changes (no reason to save the starting values that
   # will never change)
   YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
 
