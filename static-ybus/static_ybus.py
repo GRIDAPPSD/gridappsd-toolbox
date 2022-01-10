@@ -60,11 +60,13 @@ def fillYbusUnique(bus1, bus2, Yval, Ybus):
 
     if bus1 not in Ybus:
         Ybus[bus1] = {}
+    if bus2 not in Ybus:
+        Ybus[bus2] = {}
 
     if bus2 in Ybus[bus1]:
         print('    *** WARNING: Unexpected existing value found for Ybus[' + bus1 + '][' + bus2 + '] when filling model value\n', flush=True)
 
-    Ybus[bus1][bus2] = Yval
+    Ybus[bus1][bus2] = Ybus[bus2][bus1] = Yval
 
 
 def fillYbusAdd(bus1, bus2, Yval, Ybus):
@@ -73,11 +75,14 @@ def fillYbusAdd(bus1, bus2, Yval, Ybus):
 
     if bus1 not in Ybus:
         Ybus[bus1] = {}
+    if bus2 not in Ybus:
+        Ybus[bus2] = {}
 
     if bus2 in Ybus[bus1]:
         Ybus[bus1][bus2] += Yval
+        Ybus[bus2][bus1] = Ybus[bus1][bus2]
     else:
-        Ybus[bus1][bus2] = Yval
+        Ybus[bus1][bus2] = Ybus[bus2][bus1] = Yval
 
 
 # START LINES
@@ -87,6 +92,8 @@ def fillYbusUniqueUpper_lines(bus1, bus2, Yval, Ybus):
 
     if bus1 not in Ybus:
         Ybus[bus1] = {}
+    if bus2 not in Ybus:
+        Ybus[bus2] = {}
 
     if bus2 in Ybus[bus1]:
         print('    *** WARNING: Unexpected existing value found for Ybus[' + bus1 + '][' + bus2 + '] when filling line model value\n', flush=True)
@@ -99,8 +106,10 @@ def fillYbusUniqueUpper_lines(bus1, bus2, Yval, Ybus):
 
     if bus3 not in Ybus:
         Ybus[bus3] = {}
+    if bus4 not in Ybus:
+        Ybus[bus4] = {}
 
-    Ybus[bus1][bus2] = Ybus[bus3][bus4] = Yval
+    Ybus[bus1][bus2] = Ybus[bus2][bus1] = Ybus[bus3][bus4] = Ybus[bus4][bus3] = Yval
 
 
 def fillYbusNoSwap_lines(bus1, bus2, Yval, Ybus):
@@ -1265,6 +1274,8 @@ def fill_Ybus_TransformerTank_xfmrs(sparql_mgr, Ybus):
 def fillYbusUnique_switches(bus1, bus2, Ybus):
     if bus1 not in Ybus:
         Ybus[bus1] = {}
+    if bus2 not in Ybus:
+        Ybus[bus2] = {}
 
     if bus2 in Ybus[bus1]:
         print('    *** WARNING: Unexpected existing value found for Ybus[' + bus1 + '][' + bus2 + '] when filling switching equipment value\n', flush=True)
@@ -1273,17 +1284,20 @@ def fillYbusUnique_switches(bus1, bus2, Ybus):
     #if bus2=='X2673305B.1' and bus1=='X2673305B.2':
     #    print('*** fillYbusUnique bus1: ' + bus1 + ', bus2: ' + bus2 + ', caller: ' + str(inspect.stack()[1].function) + ', ' + str(inspect.stack()[2].function), flush=True)
 
-    Ybus[bus1][bus2] = complex(-500.0, 500.0)
+    Ybus[bus1][bus2] = Ybus[bus2][bus1] = complex(-500.0, 500.0)
 
 
 def fillYbusAdd_switches(bus1, bus2, Ybus):
     if bus1 not in Ybus:
         Ybus[bus1] = {}
+    if bus2 not in Ybus:
+        Ybus[bus2] = {}
 
     if bus2 in Ybus[bus1]:
         Ybus[bus1][bus2] += complex(500.0, -500.0)
+        Ybus[bus2][bus1] = Ybus[bus1][bus2]
     else:
-        Ybus[bus1][bus2] = complex(500.0, -500.0)
+        Ybus[bus1][bus2] = Ybus[bus2][bus1] = complex(500.0, -500.0)
 
 
 def fillYbusNoSwap_switches(bus1, bus2, is_Open, Ybus):
@@ -1334,6 +1348,23 @@ def fill_Ybus_SwitchingEquipment_switches(sparql_mgr, Ybus):
 # FINISH SWITCHES
 
 
+def count_unique_ybus(Ybus):
+    count = 0
+
+    for bus1 in Ybus:
+        for bus2 in Ybus[bus1]:
+            if bus2 != bus1:
+                count += 1
+
+    count = int(count/2) # halve the total for duplicated entries
+
+    for bus1 in Ybus:
+        if bus1 in Ybus[bus1]:
+            count += 1
+
+    return count
+
+
 def static_ybus(feeder_mrid):
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
 
@@ -1351,27 +1382,21 @@ def static_ybus(feeder_mrid):
     fill_Ybus_WireInfo_and_WireSpacingInfo_lines(sparql_mgr, Ybus)
     #print('line_model_validator static Ybus...')
     #print(Ybus)
-    line_count = 0
-    for bus1 in Ybus:
-        line_count += len(Ybus[bus1])
+    line_count = count_unique_ybus(Ybus)
     print('\nLine_model # entries: ' + str(line_count), flush=True)
 
     fill_Ybus_PowerTransformerEnd_xfmrs(sparql_mgr, Ybus)
     fill_Ybus_TransformerTank_xfmrs(sparql_mgr, Ybus)
     #print('power_transformer_validator static Ybus...')
     #print(Ybus)
-    count = 0
-    for bus1 in Ybus:
-        count += len(Ybus[bus1])
+    count = count_unique_ybus(Ybus)
     xfmr_count = count - line_count
     print('\nPower_transformer # entries: ' + str(xfmr_count), flush=True)
 
     fill_Ybus_SwitchingEquipment_switches(sparql_mgr, Ybus)
     #print('switching_equipment_validator (final) static Ybus...')
     #print(Ybus)
-    count = 0
-    for bus1 in Ybus:
-        count += len(Ybus[bus1])
+    count = count_unique_ybus(Ybus)
     switch_count = count - line_count - xfmr_count
     print('\nSwitching_equipment # entries: ' + str(switch_count), flush=True)
 
@@ -1380,9 +1405,7 @@ def static_ybus(feeder_mrid):
         for bus2 in Ybus[bus1]:
             print(bus1 + ',' + bus2 + ',' + str(Ybus[bus1][bus2].real) + ',' + str(Ybus[bus1][bus2].imag))
 
-    ysysCount = 0
-    for bus1 in Ybus:
-        ysysCount += len(Ybus[bus1])
+    ysysCount = count_unique_ybus(Ybus)
     print('\nTotal static Ybus # entries: ' + str(ysysCount) + '\n', flush=True)
 
     return Ybus
