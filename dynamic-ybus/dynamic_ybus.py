@@ -77,17 +77,29 @@ class SimWrapper(object):
   def checkSwitchOpen(self, nodes):
     try:
       Yval = self.Ybus[nodes[0]][nodes[1]].real
+      print('DEBUG: checking for whether switch is open for forward Ybus[' + nodes[0] + '][' + nodes[1] + '] = ' + str(Yval), flush=True)
       return (abs(Yval) <= 0.001)
     except:
-      return True
+      try:
+        Yval = self.Ybus[nodes[1]][nodes[0]].real
+        print('DEBUG: checking for whether switch is open for reverse Ybus[' + nodes[1] + '][' + nodes[0] + '] = ' + str(Yval), flush=True)
+        return (abs(Yval) <= 0.001)
+      except:
+        return True
 
 
   def checkSwitchClosed(self, nodes):
     try:
       Yval = self.Ybus[nodes[0]][nodes[1]].real
+      print('DEBUG: checking for whether switch is closed for forward Ybus[' + nodes[0] + '][' + nodes[1] + '] = ' + str(Yval), flush=True)
       return (Yval>=-1000.0 and Yval<=-500.0)
     except:
-      return False
+      try:
+        Yval = self.Ybus[nodes[1]][nodes[0]].real
+        print('DEBUG: checking for whether switch is closed for reverse Ybus[' + nodes[1] + '][' + nodes[0] + '] = ' + str(Yval), flush=True)
+        return (Yval>=-1000.0 and Yval<=-500.0)
+      except:
+        return False
 
 
   def on_message(self, header, message):
@@ -218,6 +230,7 @@ class SimWrapper(object):
           print('Found switch mrid: ' + mrid + ', nodes: ' + str(nodes) + ', value: ' + str(value), flush=True)
           if value == 0: # open
             if not self.checkSwitchOpen(nodes):
+              print('Switch value changed from closed to open based on existing Ybus', flush=True)
               # New guidance from Andy:  Must figure out the elements to
               # change based off a query, not directly use the
               # Ybus[noderow][noderow] entry
@@ -242,6 +255,7 @@ class SimWrapper(object):
 
           else: # closed
             if not self.checkSwitchClosed(nodes):
+              print('Switch value changed from open to closed based on existing Ybus', flush=True)
               self.Ybus[nodes[0]][nodes[1]] = switchClosedValue
               self.Ybus[nodes[0]][nodes[0]] += switchClosedValue
               self.Ybus[nodes[1]][nodes[1]] += switchClosedValue
