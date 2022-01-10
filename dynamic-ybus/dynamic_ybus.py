@@ -58,14 +58,13 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNodes, TransformerMridToNode, TransformerOrigPos, TransformerLastPos):
+  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.Ybus = Ybus
     self.YbusOrig = YbusOrig
     self.SwitchMridToNodes = SwitchMridToNodes
     self.TransformerMridToNode = TransformerMridToNode
-    self.TransformerOrigPos = TransformerOrigPos
     self.TransformerLastPos = TransformerLastPos
     self.keepLoopingFlag = True
 
@@ -77,29 +76,17 @@ class SimWrapper(object):
   def checkSwitchOpen(self, nodes):
     try:
       Yval = self.Ybus[nodes[0]][nodes[1]].real
-      print('DEBUG: checking for whether switch is open for forward Ybus[' + nodes[0] + '][' + nodes[1] + '] = ' + str(Yval), flush=True)
       return (abs(Yval) <= 0.001)
     except:
-      try:
-        Yval = self.Ybus[nodes[1]][nodes[0]].real
-        print('DEBUG: checking for whether switch is open for reverse Ybus[' + nodes[1] + '][' + nodes[0] + '] = ' + str(Yval), flush=True)
-        return (abs(Yval) <= 0.001)
-      except:
-        return True
+      return True
 
 
   def checkSwitchClosed(self, nodes):
     try:
       Yval = self.Ybus[nodes[0]][nodes[1]].real
-      print('DEBUG: checking for whether switch is closed for forward Ybus[' + nodes[0] + '][' + nodes[1] + '] = ' + str(Yval), flush=True)
       return (Yval>=-1000.0 and Yval<=-500.0)
     except:
-      try:
-        Yval = self.Ybus[nodes[1]][nodes[0]].real
-        print('DEBUG: checking for whether switch is closed for reverse Ybus[' + nodes[1] + '][' + nodes[0] + '] = ' + str(Yval), flush=True)
-        return (Yval>=-1000.0 and Yval<=-500.0)
-      except:
-        return False
+      return False
 
 
   def on_message(self, header, message):
@@ -307,8 +294,8 @@ class SimWrapper(object):
               YbusChanges[noderow] = {}
 
             # calculate the admittance multiplier based on the change in the tap
-            # position vs. the original position
-            posMultiplier = 1.0 + (value - self.TransformerOrigPos[noderow])*0.0625
+            # position vs. the original zero position
+            posMultiplier = 1.0 + value*0.0625
 
             # update Ybus based on the multiplier
             for nodecol in self.Ybus[noderow]:
@@ -352,7 +339,6 @@ def nodes_to_update(sparql_mgr):
 
     SwitchMridToNodes = {}
     TransformerMridToNode = {}
-    TransformerOrigPos = {}
     TransformerLastPos = {}
     for feeder in feeders:
       for meas in feeder['measurements']:
@@ -374,7 +360,7 @@ def nodes_to_update(sparql_mgr):
             node = node.upper()
             TransformerMridToNode[mrid] = node
             print('Transformer mrid: ' + mrid + ', node: ' + node, flush=True)
-            TransformerOrigPos[node] = TransformerLastPos[node] = 0
+            TransformerLastPos[node] = 0
           # TODO: Handle LinearShuntCompensator?
           #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
 
@@ -383,7 +369,7 @@ def nodes_to_update(sparql_mgr):
     print('Transformers:', flush=True)
     pprint.pprint(TransformerMridToNode)
 
-    return SwitchMridToNodes,TransformerMridToNode, TransformerOrigPos, TransformerLastPos
+    return SwitchMridToNodes,TransformerMridToNode,TransformerLastPos
 
 
 def opendss_ybus(sparql_mgr):
@@ -435,7 +421,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
   sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-  SwitchMridToNodes,TransformerMridToNode,TransformerOrigPos,TransformerLastPos = nodes_to_update(sparql_mgr)
+  SwitchMridToNodes,TransformerMridToNode,TransformerLastPos = nodes_to_update(sparql_mgr)
 
   # Get starting Ybus from static_ybus module
   mod_import = importlib.import_module('static-ybus.static_ybus')
@@ -452,7 +438,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   # switch node itself will be changed
   YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNodes, TransformerMridToNode, TransformerOrigPos, TransformerLastPos)
+  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
