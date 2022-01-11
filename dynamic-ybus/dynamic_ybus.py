@@ -97,20 +97,22 @@ class SimWrapper(object):
     if 'processStatus' in message:
       status = message['processStatus']
       if status=='COMPLETE' or status=='CLOSED':
-        print('simulation FINISHED!', flush=True)
         self.keepLoopingFlag = False
 
     else:
       msgdict = message['message']
       ts = msgdict['timestamp']
-      print('simulation timestamp: ' + str(ts), flush=True)
+      print('Processing simulation timestamp: ' + str(ts), flush=True)
 
       # Questions:
       # 1. HOLD Do I need to process changes to LinearShuntCompensator
       #    equipment? Ans: Yes, need guidance from Andy. Alex said I could
       #    get a CIM dictionary value to plug into the diagonal element and this
       #    would be the extent of what to change. Not sure how this relates to
-      #    new values coming from simulation output.
+      #    new values coming from simulation output. Shiva says that the MV
+      #    code, meaning static Ybus, also needs to be updated for shunt
+      #    elements and he will help with that. I'm sure he can give guidance
+      #    on what to do for the dynamic Ybus as well when that's done.
 
       # 2. HOLD Should I keep publish the full Ybus or just the
       #    lower diagonal elements (same for YbusChanges)? Ans: Just lower diag
@@ -138,10 +140,6 @@ class SimWrapper(object):
       #    making dynamic YBus aware of Topology Processor as I'm not sure
       #    of the need for this otherwise
 
-      # 8. DONE Use try/except instead of checking 'value' in measurement.
-      #    Also, it's not guaranteed that the mrid will exist either and this
-      #    will catch that
-
       switchOpenValue = complex(0,0)
       switchClosedValue = complex(-500,500)
 
@@ -152,10 +150,10 @@ class SimWrapper(object):
         try:
           value = msgdict['measurements'][mrid]['value']
           nodes = self.SwitchMridToNodes[mrid] # two endpoints for switch
-          print('Found switch mrid: ' + mrid + ', nodes: ' + str(nodes) + ', value: ' + str(value), flush=True)
+          #print('Found switch mrid: ' + mrid + ', nodes: ' + str(nodes) + ', value: ' + str(value), flush=True)
           if value == 0: # open
             if not self.checkSwitchOpen(nodes):
-              print('Switch value changed from closed to open based on existing Ybus', flush=True)
+              print('Switch value changed from closed to open for nodes: ' + str(nodes), flush=True)
               self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchOpenValue
               # Modify diagnonal terms for both endpoints
               self.Ybus[nodes[0]][nodes[0]] -= switchClosedValue
@@ -171,7 +169,7 @@ class SimWrapper(object):
 
           else: # closed
             if not self.checkSwitchClosed(nodes):
-              print('Switch value changed from open to closed based on existing Ybus', flush=True)
+              print('Switch value changed from open to closed for nodes: ' + str(nodes), flush=True)
               self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchClosedValue
               self.Ybus[nodes[0]][nodes[0]] += switchClosedValue
               self.Ybus[nodes[1]][nodes[1]] += switchClosedValue
@@ -203,7 +201,7 @@ class SimWrapper(object):
         try:
           value = msgdict['measurements'][mrid]['value']
           noderow = self.TransformerMridToNode[mrid]
-          print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+          #print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
           if value != self.TransformerLastPos[noderow]:
             print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
             self.TransformerLastPos[noderow] = value
@@ -228,9 +226,6 @@ class SimWrapper(object):
             self.Ybus[noderow][noderow] = Yval
             YbusChanges[noderow][noderow] = Yval
 
-          #else:
-          #  print('Transformer value NOT changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
-
         except:
           if mrid not in msgdict['measurements']:
             print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
@@ -239,10 +234,12 @@ class SimWrapper(object):
           else:
             print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
-      if len(YbusChanges) > 0: # Ybus changed if there are any entries here
+      if len(YbusChanges) > 0: # Ybus changed if there are any entries
         print('*** Ybus changed so I will publish full Ybus and minimal YbusChanges!', flush=True)
+        pprint.pprint(YbusChanges)
+        print('', flush=True)
       else:
-        print('Ybus NOT changed so nothing to do here', flush=True)
+        print('Ybus NOT changed\n', flush=True)
 
 
 def nodes_to_update(sparql_mgr):
@@ -368,7 +365,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
     #print('Sleeping....', flush=True)
     time.sleep(0.1)
 
-  print('Done simulation monitoring loop', flush=True)
+  print('Finished simulation monitoring loop and Dynamic Ybus\n', flush=True)
 
   gapps.unsubscribe(conn_id1)
   gapps.unsubscribe(conn_id2)
