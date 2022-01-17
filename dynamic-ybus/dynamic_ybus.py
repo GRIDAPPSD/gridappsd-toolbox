@@ -58,7 +58,7 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos):
+  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.Ybus = Ybus
@@ -67,6 +67,7 @@ class SimWrapper(object):
     self.SwitchMridToNodes = SwitchMridToNodes
     self.TransformerMridToNode = TransformerMridToNode
     self.TransformerLastPos = TransformerLastPos
+    self.ShuntCompensatorMridToNode = ShuntCompensatorMridToNode
     self.keepLoopingFlag = True
 
 
@@ -254,6 +255,22 @@ class SimWrapper(object):
           else:
             print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
+      # Shunt compensator (capacitor) processing
+      for mrid in self.ShuntCompensatorMridToNode:
+        try:
+          value = msgdict['measurements'][mrid]['value']
+          noderow = self.ShuntCompensatorMridToNode[mrid]
+          print('Found shunt compensator mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+          # TODO the magic needs to happen here!
+
+        except:
+          if mrid not in msgdict['measurements']:
+            print('*** WARNING: Did not find shunt compensator mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+          elif 'value' not in msgdict['measurements'][mrid]:
+            print('*** WARNING: Did not find value element for shunt compensator mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+          else:
+            print('*** WARNING: Unknown exception processing shunt compensator mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+
       if len(YbusChanges) > 0: # Ybus changed if there are any entries
         print('*** Ybus changed so I will publish full Ybus and minimal YbusChanges!', flush=True)
         self.publish(YbusChanges)
@@ -278,6 +295,7 @@ def nodes_to_update(sparql_mgr):
     SwitchMridToNodes = {}
     TransformerMridToNode = {}
     TransformerLastPos = {}
+    ShuntCompensatorMridToNode = {}
     for feeder in feeders:
       for meas in feeder['measurements']:
         # Pos measurement type includes both switches and regulators
@@ -298,15 +316,20 @@ def nodes_to_update(sparql_mgr):
             TransformerMridToNode[mrid] = node
             TransformerLastPos[node] = 0
             print('Transformer mrid: ' + mrid + ', node: ' + node, flush=True)
-          # TODO: Handle LinearShuntCompensator?
-          #elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
+          elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
+            node = meas['ConnectivityNode'] + phaseToIdx[phase]
+            node = node.upper()
+            ShuntCompensatorMridToNode[mrid] = node
+            print('Shunt compensator mrid: ' + mrid + ', node: ' + node, flush=True)
 
     #print('Switches:', flush=True)
     #pprint.pprint(SwitchMridToNodes)
     #print('Transformers:', flush=True)
     #pprint.pprint(TransformerMridToNode)
+    #print('ShuntCompensators:', flush=True)
+    #pprint.pprint(ShuntCompensatorMridToNode)
 
-    return SwitchMridToNodes,TransformerMridToNode,TransformerLastPos
+    return SwitchMridToNodes,TransformerMridToNode,TransformerLastPos,ShuntCompensatorMridToNode
 
 
 def opendss_ybus(sparql_mgr):
@@ -364,7 +387,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
   sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-  SwitchMridToNodes,TransformerMridToNode,TransformerLastPos = nodes_to_update(sparql_mgr)
+  SwitchMridToNodes,TransformerMridToNode,TransformerLastPos,ShuntCompensatorMridToNode = nodes_to_update(sparql_mgr)
 
   # Get starting Ybus from static_ybus module
   mod_import = importlib.import_module('static-ybus.static_ybus')
@@ -379,7 +402,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   # will never change)
   YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos)
+  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
