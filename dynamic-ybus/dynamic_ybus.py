@@ -185,8 +185,12 @@ class SimWrapper(object):
             if not self.checkSwitchOpen(nodes):
               print('Switch value changed from closed to open for nodes: ' + str(nodes), flush=True)
               self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchOpenValue
-              # Modify diagnonal terms for both endpoints
+              # Modify diagonal terms for both endpoints
+              if nodes[0] not in self.Ybus[nodes[0]]:
+                self.Ybus[nodes[0]][nodes[0]] = switchOpenValue
               self.Ybus[nodes[0]][nodes[0]] -= switchClosedValue
+              if nodes[1] not in self.Ybus[nodes[1]]:
+                self.Ybus[nodes[1]][nodes[1]] = switchOpenValue
               self.Ybus[nodes[1]][nodes[1]] -= switchClosedValue
 
               if nodes[0] not in YbusChanges:
@@ -194,14 +198,23 @@ class SimWrapper(object):
               if nodes[1] not in YbusChanges:
                 YbusChanges[nodes[1]] = {}
               YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchOpenValue
+
+              if nodes[0] not in YbusChanges[nodes[0]]:
+                YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
               YbusChanges[nodes[0]][nodes[0]] -= switchClosedValue
+              if nodes[1] not in YbusChanges[nodes[1]]:
+                YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
               YbusChanges[nodes[1]][nodes[1]] -= switchClosedValue
 
           else: # closed
             if not self.checkSwitchClosed(nodes):
               print('Switch value changed from open to closed for nodes: ' + str(nodes), flush=True)
               self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchClosedValue
+              if nodes[0] not in self.Ybus[nodes[0]]:
+                self.Ybus[nodes[0]][nodes[0]] = switchOpenValue
               self.Ybus[nodes[0]][nodes[0]] += switchClosedValue
+              if nodes[1] not in self.Ybus[nodes[1]]:
+                self.Ybus[nodes[1]][nodes[1]] = switchOpenValue
               self.Ybus[nodes[1]][nodes[1]] += switchClosedValue
 
               if nodes[0] not in YbusChanges:
@@ -213,7 +226,6 @@ class SimWrapper(object):
               if nodes[0] not in YbusChanges[nodes[0]]:
                 YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
               YbusChanges[nodes[0]][nodes[0]] += switchClosedValue
-
               if nodes[1] not in YbusChanges[nodes[1]]:
                 YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
               YbusChanges[nodes[1]][nodes[1]] += switchClosedValue
