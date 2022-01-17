@@ -78,7 +78,13 @@ class SimWrapper(object):
   def checkSwitchOpen(self, nodes):
     try:
       Yval = self.Ybus[nodes[0]][nodes[1]].real
-      return (abs(Yval) <= 0.001)
+      if abs(Yval) <= 0.001:
+        return True
+      elif Yval <= -500.0:
+        return False
+      else:
+        print('*** WARNING: Found unexpected switch Ybus value checking for open: ' + str(Yval), flush=True)
+        return False
     except:
       return True
 
@@ -86,7 +92,13 @@ class SimWrapper(object):
   def checkSwitchClosed(self, nodes):
     try:
       Yval = self.Ybus[nodes[0]][nodes[1]].real
-      return (Yval>=-1000.0 and Yval<=-500.0)
+      if Yval <= -500.0:
+        return True
+      elif abs(Yval) <= 0.001:
+        return False
+      else:
+        print('*** WARNING: Found unexpected switch Ybus value checking for closed: ' + str(Yval), flush=True)
+        return False
     except:
       return False
 
@@ -135,19 +147,16 @@ class SimWrapper(object):
       #    elements and he will help with that. I'm sure he can give guidance
       #    on what to do for the dynamic Ybus as well when that's done.
 
-      # 2. HOLD Should I keep publish the full Ybus or just the
-      #    lower diagonal elements (same for YbusChanges)? Ans: Just lower diag
-
-      # 3. HOLD Do we need to publish an index number based version of Ybus
+      # 2. HOLD Do we need to publish an index number based version of Ybus
       #    vs. just the node name based version? Ans:  Don't think so as index
       #    is just an artifact of the node list order and not meaningful.
       #    Shiva thinks I should publish an index based version so need to
       #    combe back to this
 
-      # 4. HOLD Should the ActiveMQ message format for Ybus just be the "sparse"
+      # 3. HOLD Should the ActiveMQ message format for Ybus just be the "sparse"
       #    dictionary of dictionaries? Ans: Yes
 
-      # 5. HOLD Should the real and imaginary components of complex Ybus values
+      # 4. HOLD Should the real and imaginary components of complex Ybus values
       #    be two separate floating point values in the published message
       #    instead of some complex number representation? Ans: If JSON directly
       #    supports complex number representation vs. some ugly string
@@ -155,7 +164,7 @@ class SimWrapper(object):
       #    components into floats. Based on googling, it looks like JSON has
       #    no direct support for complex numbers so need to separate components
 
-      # 7. HOLD Andy talked about creating a separate Ybus for each feeder and
+      # 5. HOLD Andy talked about creating a separate Ybus for each feeder and
       #    island.  Right now I have only a monolithic Ybus so need to come
       #    back and get more guidance on this.  Perhaps this is related to
       #    making dynamic YBus aware of Topology Processor as I'm not sure
@@ -243,7 +252,7 @@ class SimWrapper(object):
               YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = Yval
 
             # for the diagonal element square the multiplier for YbusOrig
-            Yval = self.YbusOrig[noderow][nodecol] * posMultiplier**2
+            Yval = self.YbusOrig[noderow][noderow] * posMultiplier**2
             self.Ybus[noderow][noderow] = Yval
             YbusChanges[noderow][noderow] = Yval
 
