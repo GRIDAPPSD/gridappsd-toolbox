@@ -1347,6 +1347,216 @@ def fill_Ybus_SwitchingEquipment_switches(sparql_mgr, Ybus):
                     fillYbusNoSwap_switches(bus1+ybusPhaseIdx[phase], bus2+ybusPhaseIdx[phase], is_Open, Ybus)
 # FINISH SWITCHES
 
+# START SHUNTS
+def fill_Ybus_ShuntElement_shunts(sparql_mgr, Ybus):
+    # map query phase values to nodelist indexes
+    ybusPhaseIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
+
+    # CAPACITORS DATA STRUCTURES INITIALIZATION
+    bindings = sparql_mgr.ShuntElement_cap_names()
+    #print('SHUNT_ELEMENT_VALIDATOR ShuntElement cap_names query results:', flush=True)
+    #print(bindings, flush=True)
+    #print('SHUNT_ELEMENT_VALIDATOR ShuntElement cap_names query results:', file=logfile)
+    #print(bindings, file=logfile)
+
+    Cap_name = {}
+    B_per_section = {}
+    for obj in bindings:
+        cap_name = obj['cap_name']['value']
+        B_per_section[cap_name] = float(obj['b_per_section']['value'])
+        bus = obj['bus']['value'].upper()
+        phase = 'ABC' # no phase specified indicates 3-phase
+        if 'phase' in obj:
+            phase = obj['phase']['value']
+        mode = 'voltage'
+        if 'mode' in obj:
+            mode = obj['mode']['value']
+        #print('cap_name: ' + cap_name + ', b_per_section: ' + str(b_per_section) + ', phase: ' + phase + ', mode: ' + mode)
+
+        if mode != 'timeScheduled':
+            if phase == 'ABC': # 3-phase
+                if bus+'.1' not in Cap_name:
+                    Cap_name[bus+'.1'] = []
+                    Cap_name[bus+'.2'] = []
+                    Cap_name[bus+'.3'] = []
+                Cap_name[bus+'.1'].append(cap_name)
+                Cap_name[bus+'.2'].append(cap_name)
+                Cap_name[bus+'.3'].append(cap_name)
+            else: # specified phase only
+                if bus+ybusPhaseIdx[phase] not in Cap_name:
+                    Cap_name[bus+ybusPhaseIdx[phase]] = []
+                Cap_name[bus+ybusPhaseIdx[phase]].append(cap_name)
+    print(Cap_name)
+
+    # TRANSFORMERS DATA STRUCTURES INITIALIZATION
+    bindings = sparql_mgr.TransformerTank_xfmr_rated()
+    #print('SHUNT_ELEMENT_VALIDATOR TransformerTank xfmr_rated query results:', flush=True)
+    #print(bindings, flush=True)
+    #print('SHUNT_ELEMENT_VALIDATOR TransformerTank xfmr_rated query results:', file=logfile)
+    #print(bindings, file=logfile)
+
+    # TransformerTank queries
+    RatedS_tank = {}
+    RatedU_tank = {}
+    for obj in bindings:
+        xfmr_name = obj['xfmr_name']['value']
+        enum = int(obj['enum']['value'])
+        if xfmr_name not in RatedS_tank:
+            RatedS_tank[xfmr_name] = {}
+            RatedU_tank[xfmr_name] = {}
+
+        RatedS_tank[xfmr_name][enum] = int(float(obj['ratedS']['value']))
+        RatedU_tank[xfmr_name][enum] = int(obj['ratedU']['value'])
+        #print('xfmr_name: ' + xfmr_name + ', enum: ' + str(enum) + ', ratedS: ' + str(RatedS_tank[xfmr_name][enum]) + ', ratedU: ' + str(RatedU_tank[xfmr_name][enum]))
+
+    bindings = sparql_mgr.TransformerTank_xfmr_nlt()
+    #print('SHUNT_ELEMENT_VALIDATOR TransformerTank xfmr_nlt query results:', flush=True)
+    #print(bindings, flush=True)
+    #print('SHUNT_ELEMENT_VALIDATOR TransformerTank xfmr_nlt query results:', file=logfile)
+    #print(bindings, file=logfile)
+
+    Noloadloss = {}
+    I_exciting = {}
+    for obj in bindings:
+        xfmr_name = obj['xfmr_name']['value']
+        Noloadloss[xfmr_name] = float(obj['noloadloss_kW']['value'])
+        I_exciting[xfmr_name] = float(obj['i_exciting']['value'])
+        #print('xfmr_name: ' + xfmr_name + ', noloadloss: ' + str(Noloadloss[xfmr_name]) + ', i_exciting: ' + str(I_exciting[xfmr_name]))
+
+    bindings = sparql_mgr.TransformerTank_xfmr_names()
+    #print('SHUNT_ELEMENT_VALIDATOR TransformerTank xfmr_names query results:', flush=True)
+    #print(bindings, flush=True)
+    #print('SHUNT_ELEMENT_VALIDATOR TransformerTank xfmr_names query results:', file=logfile)
+    #print(bindings, file=logfile)
+
+    Xfmr_tank_name = {}
+    Enum_tank = {}
+    BaseV_tank = {}
+    for obj in bindings:
+        xfmr_name = obj['xfmr_name']['value']
+        enum = int(obj['enum']['value'])
+        bus = obj['bus']['value'].upper()
+        baseV = float(obj['baseV']['value'])
+
+        if xfmr_name not in Enum_tank:
+            Enum_tank[xfmr_name] = {}
+            BaseV_tank[xfmr_name] = {}
+
+        Enum_tank[xfmr_name][bus] = enum
+        BaseV_tank[xfmr_name][bus] = baseV
+
+        phase = obj['phase']['value']
+        if phase == 'ABC':
+            if bus+'.1' not in Xfmr_tank_name:
+                Xfmr_tank_name[bus+'.1'] = []
+                Xfmr_tank_name[bus+'.2'] = []
+                Xfmr_tank_name[bus+'.3'] = []
+            Xfmr_tank_name[bus+'.1'].append(xfmr_name)
+            Xfmr_tank_name[bus+'.2'].append(xfmr_name)
+            Xfmr_tank_name[bus+'.3'].append(xfmr_name)
+        else:
+            if bus+ybusPhaseIdx[phase] not in Xfmr_tank_name:
+                Xfmr_tank_name[bus+ybusPhaseIdx[phase]] = []
+            Xfmr_tank_name[bus+ybusPhaseIdx[phase]].append(xfmr_name)
+
+        #print('xfmr_tank_name: ' + xfmr_name + ', enum: ' + str(enum) + ', bus: ' + bus + ', phase: ' + phase)
+    
+    # TransformerEnd queries
+    bindings = sparql_mgr.PowerTransformerEnd_xfmr_admittances()
+    #print('SHUNT_ELEMENT_VALIDATOR PowerTransformerEnd xfmr_admittances query results:', flush=True)
+    #print(bindings, flush=True)
+    #print('SHUNT_ELEMENT_VALIDATOR PowerTransformerEnd xfmr_admittances query results:', file=logfile)
+    #print(bindings, file=logfile)
+
+    B_S = {}
+    G_S = {}
+    for obj in bindings:
+        xfmr_name = obj['xfmr_name']['value']
+        B_S[xfmr_name] = float(obj['b_S']['value'])
+        G_S[xfmr_name] = float(obj['g_S']['value'])
+        #print('xfmr_name: ' + xfmr_name + ', b_S: ' + str(B_S[xfmr_name]) + ', g_S: ' + str(G_S[xfmr_name])
+
+    bindings = sparql_mgr.PowerTransformerEnd_xfmr_names()
+    #print('SHUNT_ELEMENT_VALIDATOR PowerTransformerEnd xfmr_names query results:', flush=True)
+    #print(bindings, flush=True)
+    #print('SHUNT_ELEMENT_VALIDATOR PowerTransformerEnd xfmr_names query results:', file=logfile)
+    #print(bindings, file=logfile)
+
+    Xfmr_end_name = {}
+    RatedU_end = {}
+    Enum_end = {}
+    for obj in bindings:
+        xfmr_name = obj['xfmr_name']['value']
+        enum = int(obj['end_number']['value'])
+        bus = obj['bus']['value'].upper()
+        if bus+'.1' not in Xfmr_end_name:
+            Xfmr_end_name[bus+'.1'] = []
+            Xfmr_end_name[bus+'.2'] = []
+            Xfmr_end_name[bus+'.3'] = []
+        Xfmr_end_name[bus+'.1'].append(xfmr_name)
+        Xfmr_end_name[bus+'.2'].append(xfmr_name)
+        Xfmr_end_name[bus+'.3'].append(xfmr_name)
+
+        if xfmr_name not in Enum_end:
+            Enum_end[xfmr_name] = {}
+            RatedU_end[xfmr_name] = {}
+
+        Enum_end[xfmr_name][bus] = enum
+        RatedU_end[xfmr_name][enum] = int(obj['ratedU']['value'])
+        #print('xfmr_end_name: ' + xfmr_name + ', end_number: ' + str(enum) + ', bus: ' + bus + ', ratedU: ' + str(RatedU_end[xfmr_name][enum]))
+  
+    # just for checking how often we encounter the more exotic cases
+    MultiElem = {}
+    MultiCap = {}
+    MultiXfmrTank = {}
+    MultiXfmrEnd = {}
+
+    # this will let us skip the .2 node validation when the .1 has been
+    # identified as a split phase tank transformer
+    skipNode2 = None
+
+    for node in Cap_name:
+        sum_shunt_imag = 0
+        for cap in Cap_name[node]:
+            # no real component contribution for capacitors
+            sum_shunt_imag += B_per_section[cap]
+        print(node, sum_shunt_imag)
+
+    for node in Xfmr_tank_name:
+        sum_shunt_imag = sum_shunt_real = 0.0
+        bus = node.split('.')[0]
+        for xfmr in Xfmr_tank_name[node]:
+            if Enum_tank[xfmr][bus] >= 2:
+                # num_elem += 1
+                ratedU_sq = RatedU_tank[xfmr][2]*RatedU_tank[xfmr][2]
+                zBaseS = ratedU_sq/RatedS_tank[xfmr][2]
+                sum_shunt_real += (Noloadloss[xfmr]*1000.0)/ratedU_sq
+                #print('Adding tank transformer real contribution: ' + str((Noloadloss[xfmr]*1000.0)/ratedU_sq))
+                G_c = (Noloadloss[xfmr]*1000.0)/ratedU_sq
+                Ym = I_exciting[xfmr]/(100.0) * RatedS_tank[xfmr][2]/RatedU_tank[xfmr][2] * 1/(RatedU_tank[xfmr][2])
+                try:
+                    B_m = math.sqrt(Ym ** 2 - G_c ** 2)
+                except:
+                    B_m = Ym
+
+                sum_shunt_imag += -B_m
+        print(node, sum_shunt_real, sum_shunt_imag)
+    
+    for node in Xfmr_end_name:
+        sum_shunt_imag = sum_shunt_real = 0.0
+        bus = node.split('.')[0]
+        for xfmr in Xfmr_end_name[node]:
+            if Enum_end[xfmr][bus] == 2:
+                ratedU_ratio = RatedU_end[xfmr][1]/RatedU_end[xfmr][2]
+                ratedU_sq = ratedU_ratio*ratedU_ratio
+                sum_shunt_real += G_S[xfmr]*ratedU_sq
+                #print('Adding tank transformer real contribution: ' + str(G_S[xfmr]*ratedU_sq))
+                sum_shunt_imag += -B_S[xfmr]*ratedU_sq
+        print(node, sum_shunt_real, sum_shunt_imag)
+
+    # The shunt element should only update the existing entries, no new entries
+    # Ysys[node1][node1] +=  shunt_element(node1)
+# FINISH SHUNTS
 
 def count_unique_ybus(Ybus):
     count = 0
@@ -1380,25 +1590,32 @@ def static_ybus(feeder_mrid):
     fill_Ybus_PerLengthSequenceImpedance_lines(sparql_mgr, Ybus)
     fill_Ybus_ACLineSegment_lines(sparql_mgr, Ybus)
     fill_Ybus_WireInfo_and_WireSpacingInfo_lines(sparql_mgr, Ybus)
-    #print('line_model_validator static Ybus...')
+    #print('line_model static Ybus...')
     #print(Ybus)
     line_count = count_unique_ybus(Ybus)
     print('\nLine_model # entries: ' + str(line_count), flush=True)
 
     fill_Ybus_PowerTransformerEnd_xfmrs(sparql_mgr, Ybus)
     fill_Ybus_TransformerTank_xfmrs(sparql_mgr, Ybus)
-    #print('power_transformer_validator static Ybus...')
+    #print('power_transformer static Ybus...')
     #print(Ybus)
     count = count_unique_ybus(Ybus)
     xfmr_count = count - line_count
     print('\nPower_transformer # entries: ' + str(xfmr_count), flush=True)
 
     fill_Ybus_SwitchingEquipment_switches(sparql_mgr, Ybus)
-    #print('switching_equipment_validator (final) static Ybus...')
+    #print('switching_equipment static Ybus...')
     #print(Ybus)
     count = count_unique_ybus(Ybus)
     switch_count = count - line_count - xfmr_count
     print('\nSwitching_equipment # entries: ' + str(switch_count), flush=True)
+
+    fill_Ybus_ShuntElement_shunts(sparql_mgr, Ybus)
+    #print('shunt_element (final) static Ybus...')
+    #print(Ybus)
+    count = count_unique_ybus(Ybus)
+    shunt_count = count - line_count - xfmr_count - switch_count
+    print('\nShunt_element # entries: ' + str(shunt_count), flush=True)
 
     print('\nFull static Ybus:')
     for bus1 in Ybus:

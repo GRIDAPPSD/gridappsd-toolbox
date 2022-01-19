@@ -596,6 +596,111 @@ class SPARQLManager:
         return bindings
 
 
+    def ShuntElement_cap_names(self):
+        SHUNT_QUERY = """
+        PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX c:  <http://iec.ch/TC57/CIM100#>
+        SELECT ?cap_name ?base_volt ?nominal_volt ?b_per_section ?bus ?connection ?grnd ?phase ?ctrlenabled ?discrete ?mode ?deadband ?setpoint ?delay ?monitored_class ?monitored_eq ?monitored_bus ?monitored_phs
+        WHERE {
+         ?s r:type c:LinearShuntCompensator.
+        VALUES ?fdrid {"%s"}
+         ?s c:Equipment.EquipmentContainer ?fdr.
+         ?fdr c:IdentifiedObject.mRID ?fdrid.
+         ?s c:IdentifiedObject.name ?cap_name.
+         ?s c:ConductingEquipment.BaseVoltage ?bv.
+         ?bv c:BaseVoltage.nominalVoltage ?base_volt.
+         ?s c:ShuntCompensator.nomU ?nominal_volt.
+         ?s c:LinearShuntCompensator.bPerSection ?b_per_section.
+         ?s c:ShuntCompensator.phaseConnection ?connraw.
+          bind(strafter(str(?connraw),"PhaseShuntConnectionKind.") as ?connection)
+         ?s c:ShuntCompensator.grounded ?grnd.
+         OPTIONAL {?scp c:ShuntCompensatorPhase.ShuntCompensator ?s.
+         ?scp c:ShuntCompensatorPhase.phase ?phsraw.
+          bind(strafter(str(?phsraw),"SinglePhaseKind.") as ?phase)}
+         OPTIONAL {?ctl c:RegulatingControl.RegulatingCondEq ?s.
+          ?ctl c:RegulatingControl.discrete ?discrete.
+          ?ctl c:RegulatingControl.enabled ?ctrlenabled.
+          ?ctl c:RegulatingControl.mode ?moderaw.
+           bind(strafter(str(?moderaw),"RegulatingControlModeKind.") as ?mode)
+          ?ctl c:RegulatingControl.monitoredPhase ?monraw.
+           bind(strafter(str(?monraw),"PhaseCode.") as ?monitored_phs)
+          ?ctl c:RegulatingControl.targetDeadband ?deadband.
+          ?ctl c:RegulatingControl.targetValue ?setpoint.
+          ?s c:ShuntCompensator.aVRDelay ?delay.
+          ?ctl c:RegulatingControl.Terminal ?trm.
+          ?trm c:Terminal.ConductingEquipment ?eq.
+          ?eq a ?classraw.
+           bind(strafter(str(?classraw),"CIM100#") as ?monitored_class)
+          ?eq c:IdentifiedObject.name ?monitored_eq.
+          ?trm c:Terminal.ConnectivityNode ?moncn.
+          ?moncn c:IdentifiedObject.name ?monitored_bus.}
+         ?s c:IdentifiedObject.mRID ?id.
+         ?t c:Terminal.ConductingEquipment ?s.
+         ?t c:Terminal.ConnectivityNode ?cn.
+         ?cn c:IdentifiedObject.name ?bus
+        }
+        ORDER BY ?cap_name
+        """% self.feeder_mrid
+
+        results = self.gad.query_data(SHUNT_QUERY)
+        bindings = results['data']['results']['bindings']
+        return bindings
+
+
+    def TransformerTank_xfmr_nlt(self):
+        VALUES_QUERY = """
+        PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX c:  <http://iec.ch/TC57/CIM100#>
+        SELECT ?xfmr_name ?noloadloss_kW ?i_exciting
+        WHERE {
+        VALUES ?fdrid {"%s"}
+         ?eq c:Equipment.EquipmentContainer ?fdr.
+         ?fdr c:IdentifiedObject.mRID ?fdrid.
+         ?xft c:TransformerTank.PowerTransformer ?eq.
+         ?xft c:IdentifiedObject.name ?xfmr_name.
+         ?asset c:Asset.PowerSystemResources ?xft.
+         ?asset c:Asset.AssetInfo ?t.
+         ?p r:type c:PowerTransformerInfo.
+         ?t c:TransformerTankInfo.PowerTransformerInfo ?p.
+         ?t c:IdentifiedObject.name ?xfmr_code.
+         ?e c:TransformerEndInfo.TransformerTankInfo ?t.
+         ?nlt c:NoLoadTest.EnergisedEnd ?e.
+         ?nlt c:NoLoadTest.loss ?noloadloss_kW.
+         ?nlt c:NoLoadTest.excitingCurrent ?i_exciting.
+        }
+        ORDER BY ?xfmr_name
+        """% self.feeder_mrid
+
+        results = self.gad.query_data(VALUES_QUERY)
+        bindings = results['data']['results']['bindings']
+        return bindings
+
+
+    def PowerTransformerEnd_xfmr_admittances(self):
+        VALUES_QUERY = """
+        PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX c:  <http://iec.ch/TC57/CIM100#>
+        SELECT ?xfmr_name ?end_number ?b_S ?g_S
+        WHERE {
+        VALUES ?fdrid {"%s"}
+         ?p c:Equipment.EquipmentContainer ?fdr.
+         ?fdr c:IdentifiedObject.mRID ?fdrid.
+         ?p r:type c:PowerTransformer.
+         ?p c:IdentifiedObject.name ?xfmr_name.
+         ?end c:PowerTransformerEnd.PowerTransformer ?p.
+         ?adm c:TransformerCoreAdmittance.TransformerEnd ?end.
+         ?end c:TransformerEnd.endNumber ?end_number.
+         ?adm c:TransformerCoreAdmittance.b ?b_S.
+         ?adm c:TransformerCoreAdmittance.g ?g_S.
+        }
+        ORDER BY ?xfmr_name
+        """% self.feeder_mrid
+
+        results = self.gad.query_data(VALUES_QUERY)
+        bindings = results['data']['results']['bindings']
+        return bindings
+
+
     def ybus_export(self):
         message = {
         "configurationType": "YBus Export",
