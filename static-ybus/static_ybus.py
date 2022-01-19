@@ -1602,9 +1602,7 @@ def static_ybus(feeder_mrid):
     fill_Ybus_ShuntElement_shunts(sparql_mgr, Ybus)
     #print('shunt_element (final) static Ybus...')
     #print(Ybus)
-    count = count_unique_ybus(Ybus)
-    shunt_count = count - line_count - xfmr_count - switch_count
-    print('\nShunt_element # entries: ' + str(shunt_count), flush=True)
+    print('\nShunt_element contributions added (no new entries)', flush=True)
 
     print('\nFull static Ybus:')
     for bus1 in Ybus:
