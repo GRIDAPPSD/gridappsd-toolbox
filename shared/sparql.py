@@ -591,7 +591,7 @@ class SPARQLManager:
         ORDER BY ?sw_name ?sw_phase_name
         """% self.feeder_mrid
 
-        results = self.gad.query_data(SWITCHES_QUERY, timeout=90)
+        results = self.gad.query_data(SWITCHES_QUERY)
         bindings = results['data']['results']['bindings']
         return bindings
 
