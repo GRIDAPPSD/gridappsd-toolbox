@@ -1382,19 +1382,19 @@ def fill_Ybus_ShuntElement_shunts(sparql_mgr, Ybus):
             mode = obj['mode']['value']
         print('cap_name: ' + cap_name + ', b_per_section: ' + str(B_per_section[cap_name]) + ', bus: ' + bus + ', phase: ' + phase + ', mode: ' + mode)
 
-        if mode != 'timeScheduled':
-            if phase == 'ABC': # 3-phase
-                if bus+'.1' not in Cap_name:
-                    Cap_name[bus+'.1'] = []
-                    Cap_name[bus+'.2'] = []
-                    Cap_name[bus+'.3'] = []
-                Cap_name[bus+'.1'].append(cap_name)
-                Cap_name[bus+'.2'].append(cap_name)
-                Cap_name[bus+'.3'].append(cap_name)
-            else: # specified phase only
-                if bus+ybusPhaseIdx[phase] not in Cap_name:
-                    Cap_name[bus+ybusPhaseIdx[phase]] = []
-                Cap_name[bus+ybusPhaseIdx[phase]].append(cap_name)
+        #if mode != 'timeScheduled':
+        if phase == 'ABC': # 3-phase
+            if bus+'.1' not in Cap_name:
+                Cap_name[bus+'.1'] = []
+                Cap_name[bus+'.2'] = []
+                Cap_name[bus+'.3'] = []
+            Cap_name[bus+'.1'].append(cap_name)
+            Cap_name[bus+'.2'].append(cap_name)
+            Cap_name[bus+'.3'].append(cap_name)
+        else: # specified phase only
+            if bus+ybusPhaseIdx[phase] not in Cap_name:
+                Cap_name[bus+ybusPhaseIdx[phase]] = []
+            Cap_name[bus+ybusPhaseIdx[phase]].append(cap_name)
     #print(Cap_name)
 
     # TRANSFORMERS DATA STRUCTURES INITIALIZATION
