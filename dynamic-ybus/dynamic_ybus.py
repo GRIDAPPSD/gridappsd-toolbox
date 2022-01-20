@@ -58,7 +58,7 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode):
+  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode, ShuntCompensatorMridToYbusContrib):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.Ybus = Ybus
@@ -68,6 +68,7 @@ class SimWrapper(object):
     self.TransformerMridToNode = TransformerMridToNode
     self.TransformerLastPos = TransformerLastPos
     self.ShuntCompensatorMridToNode = ShuntCompensatorMridToNode
+    self.ShuntCompensatorMridToYbusContrib = ShuntCompensatorMridToYbusContrib
     self.keepLoopingFlag = True
 
 
@@ -309,6 +310,15 @@ def nodes_to_update(sparql_mgr):
       bus2 = obj['bus2']['value'].upper()
       switchToBuses[sw_name] = [bus1, bus2]
 
+    # Get the per capacitor Ybus contributions
+    bindings = sparql_mgr.ShuntElement_cap_names()
+    CapToYbusContrib = {}
+    for obj in bindings:
+      cap_name = obj['cap_name']['value']
+      b_per_section = float(obj['b_per_section']['value'])
+      CapToYbusContrib[cap_name] = complex(0.0, b_per_section)
+      #print('cap_name: ' + cap_name + ', b_per_section: ' + str(b_per_section))
+
     feeders = sparql_mgr.cim_export()
 
     phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
@@ -317,6 +327,7 @@ def nodes_to_update(sparql_mgr):
     TransformerMridToNode = {}
     TransformerLastPos = {}
     ShuntCompensatorMridToNode = {}
+    ShuntCompensatorMridToYbusContrib = {}
     for feeder in feeders:
       for meas in feeder['measurements']:
         # Pos measurement type includes both switches and regulators
@@ -342,6 +353,13 @@ def nodes_to_update(sparql_mgr):
             node = node.upper()
             ShuntCompensatorMridToNode[mrid] = node
             print('Shunt compensator mrid: ' + mrid + ', node: ' + node, flush=True)
+            cap_name = meas['ConductingEquipment_name']
+            if cap_name in CapToYbusContrib:
+              ShuntCompensatorMridToYbusContrib[mrid] = CapToYbusContrib[cap_name]
+              print('Shunt compensator Ybus contribution: ' + str(CapToYbusContrib[cap_name]), flush=True)
+            else:
+              print('*** WARNING: CIM dictionary capacitor name not found from b_per_section query: ' + cap_name, flush=True)
+            #print(meas)
 
     #print('Switches:', flush=True)
     #pprint.pprint(SwitchMridToNodes)
@@ -349,8 +367,9 @@ def nodes_to_update(sparql_mgr):
     #pprint.pprint(TransformerMridToNode)
     #print('ShuntCompensators:', flush=True)
     #pprint.pprint(ShuntCompensatorMridToNode)
+    #pprint.pprint(ShuntCompensatorMridToYbusContrib)
 
-    return SwitchMridToNodes,TransformerMridToNode,TransformerLastPos,ShuntCompensatorMridToNode
+    return SwitchMridToNodes,TransformerMridToNode,TransformerLastPos,ShuntCompensatorMridToNode,ShuntCompensatorMridToYbusContrib
 
 
 def opendss_ybus(sparql_mgr):
@@ -408,7 +427,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
   sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-  SwitchMridToNodes,TransformerMridToNode,TransformerLastPos,ShuntCompensatorMridToNode = nodes_to_update(sparql_mgr)
+  SwitchMridToNodes,TransformerMridToNode,TransformerLastPos,ShuntCompensatorMridToNode,ShuntCompensatorMridToYbusContrib = nodes_to_update(sparql_mgr)
 
   # Get starting Ybus from static_ybus module
   mod_import = importlib.import_module('static-ybus.static_ybus')
@@ -423,7 +442,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   # will never change)
   YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode)
+  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode, ShuntCompensatorMridToYbusContrib)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
