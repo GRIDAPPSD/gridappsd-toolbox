@@ -1377,10 +1377,10 @@ def fill_Ybus_ShuntElement_shunts(sparql_mgr, Ybus):
         phase = 'ABC' # no phase specified indicates 3-phase
         if 'phase' in obj:
             phase = obj['phase']['value']
-        mode = 'voltage'
-        if 'mode' in obj:
-            mode = obj['mode']['value']
-        print('cap_name: ' + cap_name + ', b_per_section: ' + str(B_per_section[cap_name]) + ', bus: ' + bus + ', phase: ' + phase + ', mode: ' + mode)
+        #mode = 'voltage'
+        #if 'mode' in obj:
+        #    mode = obj['mode']['value']
+        #print('cap_name: ' + cap_name + ', B_per_section[cap_name]: ' + str(B_per_section[cap_name]) + ', bus: ' + bus + ', phase: ' + phase)
 
         #if mode != 'timeScheduled':
         if phase == 'ABC': # 3-phase
@@ -1509,7 +1509,7 @@ def fill_Ybus_ShuntElement_shunts(sparql_mgr, Ybus):
         for cap in Cap_name[node]:
             # no real component contribution for capacitors
             sum_shunt_imag += B_per_section[cap]
-        print('Shunt element capacitor Ybus[' + node + '][' + node + '] contribution: ' + str(complex(0.0, sum_shunt_imag)), flush=True)
+        #print('Shunt element capacitor Ybus[' + node + '][' + node + '] contribution: ' + str(complex(0.0, sum_shunt_imag)), flush=True)
         fillYbusOnlyAdd_shunts(node, complex(0.0, sum_shunt_imag), Ybus)
 
     for node in Xfmr_tank_name:
@@ -1530,7 +1530,7 @@ def fill_Ybus_ShuntElement_shunts(sparql_mgr, Ybus):
                     B_m = Ym
 
                 sum_shunt_imag += -B_m
-        print('Shunt element transformer tank Ybus[' + node + '][' + node + '] contribution: ' + str(complex(sum_shunt_real, sum_shunt_imag)), flush=True)
+        #print('Shunt element transformer tank Ybus[' + node + '][' + node + '] contribution: ' + str(complex(sum_shunt_real, sum_shunt_imag)), flush=True)
         fillYbusOnlyAdd_shunts(node, complex(sum_shunt_real, sum_shunt_imag), Ybus)
 
     for node in Xfmr_end_name:
@@ -1543,7 +1543,7 @@ def fill_Ybus_ShuntElement_shunts(sparql_mgr, Ybus):
                 sum_shunt_real += G_S[xfmr]*ratedU_sq
                 #print('Adding end transformer real contribution: ' + str(G_S[xfmr]*ratedU_sq))
                 sum_shunt_imag += -B_S[xfmr]*ratedU_sq
-        print('Shunt element transformer end Ybus[' + node + '][' + node + '] contribution: ' + str(complex(sum_shunt_real, sum_shunt_imag)), flush=True)
+        #print('Shunt element transformer end Ybus[' + node + '][' + node + '] contribution: ' + str(complex(sum_shunt_real, sum_shunt_imag)), flush=True)
         fillYbusOnlyAdd_shunts(node, complex(sum_shunt_real, sum_shunt_imag), Ybus)
 # FINISH SHUNTS
 
