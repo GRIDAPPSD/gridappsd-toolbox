@@ -283,7 +283,24 @@ class SimWrapper(object):
           value = msgdict['measurements'][mrid]['value']
           noderow = self.CapacitorMridToNode[mrid]
           print('Found capacitor mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
-          # TODO the magic needs to happen here!
+          if value == 0: # off
+            if self.CapacitorLastValue[noderow] == 1:
+              print('Capacitor value changed from on to off for node: ' + noderow, flush=True)
+              self.CapacitorLastValue[noderow] = value
+              self.Ybus[noderow][noderow] -= self.CapacitorMridToYbusContrib[mrid]
+              if noderow not in YbusChanges:
+                YbusChanges[noderow] = {}
+              YbusChanges[noderow][noderow] = self.Ybus[noderow][noderow]
+
+
+          elif value == 1: # on
+            if self.CapacitorLastValue[noderow] == 0:
+              print('Capacitor value changed from off to on for node: ' + noderow, flush=True)
+              self.CapacitorLastValue[noderow] = value
+              self.Ybus[noderow][noderow] += self.CapacitorMridToYbusContrib[mrid]
+              if noderow not in YbusChanges:
+                YbusChanges[noderow] = {}
+              YbusChanges[noderow][noderow] = self.Ybus[noderow][noderow]
 
         except:
           if mrid not in msgdict['measurements']:
