@@ -117,10 +117,10 @@ class SimWrapper(object):
 
 
   def publish(self, YbusChanges):
-    print('Ybus Changes lower diagonal:', flush=True)
+    print('\nYbus Changes lower diagonal:', flush=True)
     self.printLower(YbusChanges)
-    print('Full Ybus lower diagonal:', flush=True)
-    self.printLower(self.Ybus)
+    #print('Full Ybus lower diagonal:', flush=True)
+    #self.printLower(self.Ybus)
 
 
   def on_message(self, header, message):
@@ -249,8 +249,7 @@ class SimWrapper(object):
             print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
             # calculate the admittance multiplier based on the change in the tap
             # position, last value vs. new value
-            posMultiplier = (1.0 + self.TransformerLastPos[noderow]*0.0625)**2 /
-                            (1.0 + value*0.0625)**2
+            posMultiplier = (1.0 + self.TransformerLastPos[noderow]*0.0625)**2/(1.0 + value*0.0625)**2
 
             self.TransformerLastPos[noderow] = value
 
@@ -284,7 +283,7 @@ class SimWrapper(object):
         try:
           value = msgdict['measurements'][mrid]['value']
           noderow = self.CapacitorMridToNode[mrid]
-          print('Found capacitor mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+          #print('Found capacitor mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
           if value == 0: # off
             if self.CapacitorLastValue[noderow] == 1:
               print('Capacitor value changed from on to off for node: ' + noderow, flush=True)
