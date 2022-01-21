@@ -249,7 +249,7 @@ class SimWrapper(object):
             print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
             # calculate the admittance multiplier based on the change in the tap
             # position, last value vs. new value
-            posMultiplier = (1.0 + self.TransformerLastPos[noderow]*0.0625)**2/(1.0 + value*0.0625)**2
+            posMultiplier = (1.0 + self.TransformerLastPos[noderow]*0.0625)/(1.0 + value*0.0625)
 
             self.TransformerLastPos[noderow] = value
 
