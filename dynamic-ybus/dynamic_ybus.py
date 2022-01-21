@@ -247,14 +247,15 @@ class SimWrapper(object):
           #print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
           if value != self.TransformerLastPos[noderow]:
             print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
+            # calculate the admittance multiplier based on the change in the tap
+            # position, last value vs. new value
+            posMultiplier = (1.0 + self.TransformerLastPos[noderow]*0.0625)**2 /
+                            (1.0 + value*0.0625)**2
+
             self.TransformerLastPos[noderow] = value
 
             if noderow not in YbusChanges:
               YbusChanges[noderow] = {}
-
-            # calculate the admittance multiplier based on the change in the tap
-            # position vs. the original zero position
-            posMultiplier = 1.0 + (value-self.TransformerLastPos[noderow])*0.0625
 
             # update Ybus based on the multiplier
             for nodecol in self.Ybus[noderow]:
@@ -264,8 +265,9 @@ class SimWrapper(object):
                 YbusChanges[nodecol] = {}
               YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = Yval
 
-            # for the diagonal element square the multiplier
-            Yval = self.Ybus[noderow][noderow] * posMultiplier**2
+            # for the diagonal element, apply posMultiplier a 2nd time
+            # to square the value
+            Yval = self.Ybus[noderow][noderow] * posMultiplier
             self.Ybus[noderow][noderow] = Yval
             YbusChanges[noderow][noderow] = Yval
 
