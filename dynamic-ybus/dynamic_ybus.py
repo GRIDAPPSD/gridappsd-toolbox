@@ -319,6 +319,8 @@ class SimWrapper(object):
 
 
 def nodes_to_update(sparql_mgr):
+    print('\nFinding nodes to track for Ybus updates...', flush=True)
+
     bindings = sparql_mgr.SwitchingEquipment_switch_names()
 
     switchToBuses = {}
@@ -347,6 +349,7 @@ def nodes_to_update(sparql_mgr):
     CapacitorMridToNode = {}
     CapacitorLastValue = {}
     CapacitorMridToYbusContrib = {}
+
     for feeder in feeders:
       for meas in feeder['measurements']:
         # Pos measurement type includes both switches and regulators
@@ -376,8 +379,9 @@ def nodes_to_update(sparql_mgr):
             cap_name = meas['ConductingEquipment_name']
             if cap_name in CapToYbusContrib:
               CapacitorMridToYbusContrib[mrid] = CapToYbusContrib[cap_name]
-              print('Capacitor Ybus contribution: ' + str(CapToYbusContrib[cap_name]), flush=True)
+              print('Capcitor mrid: ' + mrid + ', node: ' + node + ', Ybus contribution: ' + str(CapToYbusContrib[cap_name]), flush=True)
             else:
+              print('Capcitor mrid: ' + mrid + ', node: ' + node, flush=True)
               print('*** WARNING: CIM dictionary capacitor name not found from b_per_section query: ' + cap_name, flush=True)
             #print(meas)
 
