@@ -58,11 +58,10 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode, ShuntCompensatorMridToYbusContrib):
+  def __init__(self, gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode, ShuntCompensatorMridToYbusContrib):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.Ybus = Ybus
-    self.YbusOrig = YbusOrig
     self.NodeIndex = NodeIndex
     self.SwitchMridToNodes = SwitchMridToNodes
     self.TransformerMridToNode = TransformerMridToNode
@@ -254,18 +253,18 @@ class SimWrapper(object):
 
             # calculate the admittance multiplier based on the change in the tap
             # position vs. the original zero position
-            posMultiplier = 1.0 + value*0.0625
+            posMultiplier = 1.0 + (value-self.TransformerLastPos[noderow])*0.0625
 
             # update Ybus based on the multiplier
             for nodecol in self.Ybus[noderow]:
-              Yval = self.YbusOrig[noderow][nodecol] * posMultiplier
+              Yval = self.Ybus[noderow][nodecol] * posMultiplier
               self.Ybus[noderow][nodecol] = self.Ybus[nodecol][noderow] = Yval
               if nodecol not in YbusChanges:
                 YbusChanges[nodecol] = {}
               YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = Yval
 
-            # for the diagonal element square the multiplier for YbusOrig
-            Yval = self.YbusOrig[noderow][noderow] * posMultiplier**2
+            # for the diagonal element square the multiplier
+            Yval = self.Ybus[noderow][noderow] * posMultiplier**2
             self.Ybus[noderow][noderow] = Yval
             YbusChanges[noderow][noderow] = Yval
 
@@ -401,23 +400,6 @@ def opendss_ybus(sparql_mgr):
   return NodeIndex
 
 
-def ybus_save_original_xfmrs(Ybus, TransformerMridToNode):
-  YbusOrig = {}
-
-  for noderow in TransformerMridToNode.values():
-    if noderow not in YbusOrig:
-      YbusOrig[noderow] = {}
-
-    for nodecol,value in Ybus[noderow].items():
-      # No need to reverse nodes for full Ybus because we are iterating over
-      # all elements of a full Ybus
-      YbusOrig[noderow][nodecol] = value
-
-  #pprint.pprint(YbusOrig)
-
-  return YbusOrig
-
-
 def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   global logfile
   logfile = log_file
@@ -437,12 +419,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   # Get node to index mapping from OpenDSS
   NodeIndex = opendss_ybus(sparql_mgr)
 
-  # Save the starting Ybus values for all the entries that could change based
-  # on transformer value changes (no reason to save the starting values that
-  # will never change)
-  YbusOrig = ybus_save_original_xfmrs(Ybus, TransformerMridToNode)
-
-  simRap = SimWrapper(gapps, simulation_id, Ybus, YbusOrig, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode, ShuntCompensatorMridToYbusContrib)
+  simRap = SimWrapper(gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, ShuntCompensatorMridToNode, ShuntCompensatorMridToYbusContrib)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
