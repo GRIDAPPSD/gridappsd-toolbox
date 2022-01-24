@@ -295,7 +295,7 @@ class SimWrapper(object):
 
 
 def nodes_to_update(sparql_mgr):
-    print('\nFinding nodes to track for Ybus updates...', flush=True)
+    print('\nFinding dynamic Ybus nodes to track for simulation updates...', flush=True)
 
     phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
 
@@ -377,13 +377,13 @@ def nodes_to_update(sparql_mgr):
             node = node.upper()
             CapacitorMridToNode[mrid] = node
             CapacitorLastValue[node] = 1
-            print('Capcitor mrid: ' + mrid + ', node: ' + node, flush=True)
+            print('Capacitor mrid: ' + mrid + ', node: ' + node, flush=True)
             cap_name = meas['ConductingEquipment_name']
             if cap_name in CapToYbusContrib:
               CapacitorMridToYbusContrib[mrid] = CapToYbusContrib[cap_name]
-              print('Capcitor mrid: ' + mrid + ', node: ' + node + ', Ybus contribution: ' + str(CapToYbusContrib[cap_name]), flush=True)
+              #print('Capacitor mrid: ' + mrid + ', node: ' + node + ', Ybus contribution: ' + str(CapToYbusContrib[cap_name]), flush=True)
             else:
-              print('Capcitor mrid: ' + mrid + ', node: ' + node, flush=True)
+              #print('Capacitor mrid: ' + mrid + ', node: ' + node, flush=True)
               print('*** WARNING: CIM dictionary capacitor name not found from b_per_section query: ' + cap_name, flush=True)
             #print(meas)
 
@@ -394,6 +394,9 @@ def nodes_to_update(sparql_mgr):
     #print('Capacitors:', flush=True)
     #pprint.pprint(CapacitorMridToNode)
     #pprint.pprint(CapacitorMridToYbusContrib)
+
+    # Hold here for demo
+    text = input('\nWait here...')
 
     return SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue
 
@@ -443,12 +446,16 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   static_ybus_func = getattr(mod_import, 'static_ybus')
   Ybus = static_ybus_func(feeder_mrid)
 
+  # Hold here for demo
+  text = input('\nWait here...')
+
   # Get node to index mapping from OpenDSS
   NodeIndex = opendss_ybus(sparql_mgr)
 
   simRap = SimWrapper(gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
+
 
   print('Starting simulation monitoring loop....', flush=True)
 
