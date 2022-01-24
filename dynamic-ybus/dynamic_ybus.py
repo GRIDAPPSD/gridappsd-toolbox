@@ -396,7 +396,7 @@ def nodes_to_update(sparql_mgr):
     #pprint.pprint(CapacitorMridToYbusContrib)
 
     # Hold here for demo
-    text = input('\nWait here...')
+    #text = input('\nWait here...')
 
     return SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue
 
@@ -447,7 +447,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   Ybus = static_ybus_func(feeder_mrid)
 
   # Hold here for demo
-  text = input('\nWait here...')
+  #text = input('\nWait here...')
 
   # Get node to index mapping from OpenDSS
   NodeIndex = opendss_ybus(sparql_mgr)
