@@ -139,25 +139,16 @@ class SimWrapper(object):
       print('Processing simulation timestamp: ' + str(ts), flush=True)
 
       # Questions:
-      # 1. HOLD Do I need to process changes to LinearShuntCompensator
-      #    equipment? Ans: Yes, need guidance from Andy. Alex said I could
-      #    get a CIM dictionary value to plug into the diagonal element and this
-      #    would be the extent of what to change. Not sure how this relates to
-      #    new values coming from simulation output. Shiva says that the MV
-      #    code, meaning static Ybus, also needs to be updated for shunt
-      #    elements and he will help with that. I'm sure he can give guidance
-      #    on what to do for the dynamic Ybus as well when that's done.
-
-      # 2. HOLD Do we need to publish an index number based version of Ybus
+      # 1. HOLD Do we need to publish an index number based version of Ybus
       #    vs. just the node name based version? Ans:  Don't think so as index
       #    is just an artifact of the node list order and not meaningful.
       #    Shiva thinks I should publish an index based version so need to
       #    combe back to this
 
-      # 3. HOLD Should the ActiveMQ message format for Ybus just be the "sparse"
+      # 2. HOLD Should the ActiveMQ message format for Ybus just be the "sparse"
       #    dictionary of dictionaries? Ans: Yes
 
-      # 4. HOLD Should the real and imaginary components of complex Ybus values
+      # 3. HOLD Should the real and imaginary components of complex Ybus values
       #    be two separate floating point values in the published message
       #    instead of some complex number representation? Ans: If JSON directly
       #    supports complex number representation vs. some ugly string
@@ -165,7 +156,7 @@ class SimWrapper(object):
       #    components into floats. Based on googling, it looks like JSON has
       #    no direct support for complex numbers so need to separate components
 
-      # 5. HOLD Andy talked about creating a separate Ybus for each feeder and
+      # 4. HOLD Andy talked about creating a separate Ybus for each feeder and
       #    island.  Right now I have only a monolithic Ybus so need to come
       #    back and get more guidance on this.  Perhaps this is related to
       #    making dynamic YBus aware of Topology Processor as I'm not sure
@@ -190,12 +181,6 @@ class SimWrapper(object):
               # Modify diagonal terms for both endpoints
               self.Ybus[nodes[0]][nodes[0]] -= Yval_diag
               self.Ybus[nodes[1]][nodes[1]] -= Yval_diag
-              # if nodes[0] not in self.Ybus[nodes[0]]:
-              #   self.Ybus[nodes[0]][nodes[0]] = switchOpenValue
-              # self.Ybus[nodes[0]][nodes[0]] -= switchClosedValue
-              # if nodes[1] not in self.Ybus[nodes[1]]:
-              #   self.Ybus[nodes[1]][nodes[1]] = switchOpenValue
-              # self.Ybus[nodes[1]][nodes[1]] -= switchClosedValue
 
               if nodes[0] not in YbusChanges:
                 YbusChanges[nodes[0]] = {}
@@ -205,12 +190,6 @@ class SimWrapper(object):
 
               YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
               YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
-              # if nodes[0] not in YbusChanges[nodes[0]]:
-              #   YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
-              # YbusChanges[nodes[0]][nodes[0]] -= switchClosedValue
-              # if nodes[1] not in YbusChanges[nodes[1]]:
-              #   YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
-              # YbusChanges[nodes[1]][nodes[1]] -= switchClosedValue
 
           else: # closed
             if not self.checkSwitchClosed(nodes):
@@ -218,12 +197,6 @@ class SimWrapper(object):
               self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchClosedValue
               self.Ybus[nodes[0]][nodes[0]] += -switchClosedValue
               self.Ybus[nodes[1]][nodes[1]] += -switchClosedValue
-              # if nodes[0] not in self.Ybus[nodes[0]]:
-              #   self.Ybus[nodes[0]][nodes[0]] = switchOpenValue
-              # self.Ybus[nodes[0]][nodes[0]] += switchClosedValue
-              # if nodes[1] not in self.Ybus[nodes[1]]:
-              #   self.Ybus[nodes[1]][nodes[1]] = switchOpenValue
-              # self.Ybus[nodes[1]][nodes[1]] += switchClosedValue
 
               if nodes[0] not in YbusChanges:
                 YbusChanges[nodes[0]] = {}
@@ -232,13 +205,6 @@ class SimWrapper(object):
               YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchClosedValue
               YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
               YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
-
-              # if nodes[0] not in YbusChanges[nodes[0]]:
-              #   YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
-              # YbusChanges[nodes[0]][nodes[0]] += switchClosedValue
-              # if nodes[1] not in YbusChanges[nodes[1]]:
-              #   YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
-              # YbusChanges[nodes[1]][nodes[1]] += switchClosedValue
 
         except:
           if mrid not in msgdict['measurements']:
@@ -269,12 +235,10 @@ class SimWrapper(object):
             # 1. The off-diagonal element (two terminals of xfmr)
             Yval_offdiag = self.Ybus[node1][node2]
             self.Ybus[node1][node2] = self.Ybus[node2][node1] = Yval_offdiag * posMultiplier
-            # print(node1, node2, self.Ybus[node1][node2])
             # 2. The diagonal element of a regulating node
             Yval_diag = - Yval_offdiag / old_tap
             diff = self.Ybus[node2][node2] - Yval_diag
             self.Ybus[node2][node2] = - Yval_offdiag * old_tap / (new_tap ** 2) + diff
-            # print(node2, node2, self.Ybus[node2][node2])
 
             if node1 not in YbusChanges:
               YbusChanges[node1] = {}
@@ -282,28 +246,6 @@ class SimWrapper(object):
               YbusChanges[node2] = {}
             YbusChanges[node1][node2] = YbusChanges[node2][node1] = self.Ybus[node1][node2]
             YbusChanges[node2][node2] = self.Ybus[node2][node2]
-
-            # update Ybus based on the multiplier
-            # for node in self.Ybus[node2]:
-            #   Y_tr_od = - self.Ybus[node1][node2]
-            #   if node in nodes and node != node2:
-            #     Yval = self.Ybus[node][node2] * posMultiplier
-            #     self.Ybus[node][node2] = self.Ybus[node2][node] = Yval
-            #     print(node, node2, self.Ybus[node][node2])
-            #     if node not in YbusChanges:
-            #       YbusChanges[node] = {}
-            #     YbusChanges[node][node2] = YbusChanges[node2][node] = Yval
-            #   if node == node2:
-            #     Ydiag_tr = Y_tr_od / old_tap
-            #     diff = self.Ybus[node2][node2] - Ydiag_tr
-            #     self.Ybus[node2][node2] = Y_tr_od * old_tap / (new_tap ** 2) + diff
-            #     print(node2, node2, self.Ybus[node2][node2])
-
-            # for the diagonal element, apply posMultiplier a 2nd time. Note the contribution from other connected component
-            # to square the value
-            # Yval = self.Ybus[node2][node2] * posMultiplier
-            # self.Ybus[node2][node2] = Yval
-            # YbusChanges[node2][node2] = Yval
 
         except:
           if mrid not in msgdict['measurements']:
