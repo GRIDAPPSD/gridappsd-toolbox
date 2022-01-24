@@ -58,13 +58,13 @@ from gridappsd.topics import simulation_output_topic, simulation_log_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue):
+  def __init__(self, gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue):
     self.gapps = gapps
     self.simulation_id = simulation_id
     self.Ybus = Ybus
     self.NodeIndex = NodeIndex
     self.SwitchMridToNodes = SwitchMridToNodes
-    self.TransformerMridToNode = TransformerMridToNode
+    self.TransformerMridToNodes = TransformerMridToNodes
     self.TransformerLastPos = TransformerLastPos
     self.CapacitorMridToNode = CapacitorMridToNode
     self.CapacitorMridToYbusContrib = CapacitorMridToYbusContrib
@@ -185,14 +185,17 @@ class SimWrapper(object):
           if value == 0: # open
             if not self.checkSwitchOpen(nodes):
               print('Switch value changed from closed to open for nodes: ' + str(nodes), flush=True)
+              Yval_diag = -self.Ybus[nodes[0]][nodes[1]]
               self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchOpenValue
               # Modify diagonal terms for both endpoints
-              if nodes[0] not in self.Ybus[nodes[0]]:
-                self.Ybus[nodes[0]][nodes[0]] = switchOpenValue
-              self.Ybus[nodes[0]][nodes[0]] -= switchClosedValue
-              if nodes[1] not in self.Ybus[nodes[1]]:
-                self.Ybus[nodes[1]][nodes[1]] = switchOpenValue
-              self.Ybus[nodes[1]][nodes[1]] -= switchClosedValue
+              self.Ybus[nodes[0]][nodes[0]] -= Yval_diag
+              self.Ybus[nodes[1]][nodes[1]] -= Yval_diag
+              # if nodes[0] not in self.Ybus[nodes[0]]:
+              #   self.Ybus[nodes[0]][nodes[0]] = switchOpenValue
+              # self.Ybus[nodes[0]][nodes[0]] -= switchClosedValue
+              # if nodes[1] not in self.Ybus[nodes[1]]:
+              #   self.Ybus[nodes[1]][nodes[1]] = switchOpenValue
+              # self.Ybus[nodes[1]][nodes[1]] -= switchClosedValue
 
               if nodes[0] not in YbusChanges:
                 YbusChanges[nodes[0]] = {}
@@ -200,36 +203,42 @@ class SimWrapper(object):
                 YbusChanges[nodes[1]] = {}
               YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchOpenValue
 
-              if nodes[0] not in YbusChanges[nodes[0]]:
-                YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
-              YbusChanges[nodes[0]][nodes[0]] -= switchClosedValue
-              if nodes[1] not in YbusChanges[nodes[1]]:
-                YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
-              YbusChanges[nodes[1]][nodes[1]] -= switchClosedValue
+              YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
+              YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
+              # if nodes[0] not in YbusChanges[nodes[0]]:
+              #   YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
+              # YbusChanges[nodes[0]][nodes[0]] -= switchClosedValue
+              # if nodes[1] not in YbusChanges[nodes[1]]:
+              #   YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
+              # YbusChanges[nodes[1]][nodes[1]] -= switchClosedValue
 
           else: # closed
             if not self.checkSwitchClosed(nodes):
               print('Switch value changed from open to closed for nodes: ' + str(nodes), flush=True)
               self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchClosedValue
-              if nodes[0] not in self.Ybus[nodes[0]]:
-                self.Ybus[nodes[0]][nodes[0]] = switchOpenValue
-              self.Ybus[nodes[0]][nodes[0]] += switchClosedValue
-              if nodes[1] not in self.Ybus[nodes[1]]:
-                self.Ybus[nodes[1]][nodes[1]] = switchOpenValue
-              self.Ybus[nodes[1]][nodes[1]] += switchClosedValue
+              self.Ybus[nodes[0]][nodes[0]] += -switchClosedValue
+              self.Ybus[nodes[1]][nodes[1]] += -switchClosedValue
+              # if nodes[0] not in self.Ybus[nodes[0]]:
+              #   self.Ybus[nodes[0]][nodes[0]] = switchOpenValue
+              # self.Ybus[nodes[0]][nodes[0]] += switchClosedValue
+              # if nodes[1] not in self.Ybus[nodes[1]]:
+              #   self.Ybus[nodes[1]][nodes[1]] = switchOpenValue
+              # self.Ybus[nodes[1]][nodes[1]] += switchClosedValue
 
               if nodes[0] not in YbusChanges:
                 YbusChanges[nodes[0]] = {}
               if nodes[1] not in YbusChanges:
                 YbusChanges[nodes[1]] = {}
               YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchClosedValue
+              YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
+              YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
 
-              if nodes[0] not in YbusChanges[nodes[0]]:
-                YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
-              YbusChanges[nodes[0]][nodes[0]] += switchClosedValue
-              if nodes[1] not in YbusChanges[nodes[1]]:
-                YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
-              YbusChanges[nodes[1]][nodes[1]] += switchClosedValue
+              # if nodes[0] not in YbusChanges[nodes[0]]:
+              #   YbusChanges[nodes[0]][nodes[0]] = switchOpenValue
+              # YbusChanges[nodes[0]][nodes[0]] += switchClosedValue
+              # if nodes[1] not in YbusChanges[nodes[1]]:
+              #   YbusChanges[nodes[1]][nodes[1]] = switchOpenValue
+              # YbusChanges[nodes[1]][nodes[1]] += switchClosedValue
 
         except:
           if mrid not in msgdict['measurements']:
@@ -240,35 +249,61 @@ class SimWrapper(object):
             print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
       # Transformer processing
-      for mrid in self.TransformerMridToNode:
+      for mrid in self.TransformerMridToNodes:
         try:
           value = msgdict['measurements'][mrid]['value']
-          noderow = self.TransformerMridToNode[mrid]
+          nodes = self.TransformerMridToNodes[mrid]
+          node1 = nodes[0]
+          node2 = nodes[1]
           #print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
-          if value != self.TransformerLastPos[noderow]:
-            print('Transformer value changed for node: ' + noderow + ', old value: ' + str(self.TransformerLastPos[noderow]) + ', new value: ' + str(value), flush=True)
+          if value != self.TransformerLastPos[nodes[1]]:
+            print('Transformer value changed for node: ' + node2 + ', old value: ' + str(self.TransformerLastPos[node2]) + ', new value: ' + str(value), flush=True)
             # calculate the admittance multiplier based on the change in the tap
             # position, last value vs. new value
-            posMultiplier = (1.0 + self.TransformerLastPos[noderow]*0.0625)/(1.0 + value*0.0625)
+            old_tap = (1.0 + self.TransformerLastPos[node2]*0.00625)
+            new_tap = (1.0 + value*0.00625)
+            posMultiplier = old_tap / new_tap
+            self.TransformerLastPos[node2] = value
 
-            self.TransformerLastPos[noderow] = value
+            # Update the entries of system Ybus for the given tap change
+            # 1. The off-diagonal element (two terminals of xfmr)
+            Yval_offdiag = self.Ybus[node1][node2]
+            self.Ybus[node1][node2] = self.Ybus[node2][node1] = Yval_offdiag * posMultiplier
+            # print(node1, node2, self.Ybus[node1][node2])
+            # 2. The diagonal element of a regulating node
+            Yval_diag = - Yval_offdiag / old_tap
+            diff = self.Ybus[node2][node2] - Yval_diag
+            self.Ybus[node2][node2] = - Yval_offdiag * old_tap / (new_tap ** 2) + diff
+            # print(node2, node2, self.Ybus[node2][node2])
 
-            if noderow not in YbusChanges:
-              YbusChanges[noderow] = {}
+            if node1 not in YbusChanges:
+              YbusChanges[node1] = {}
+            if node2 not in YbusChanges:
+              YbusChanges[node2] = {}
+            YbusChanges[node1][node2] = YbusChanges[node2][node1] = self.Ybus[node1][node2]
+            YbusChanges[node2][node2] = self.Ybus[node2][node2]
 
             # update Ybus based on the multiplier
-            for nodecol in self.Ybus[noderow]:
-              Yval = self.Ybus[noderow][nodecol] * posMultiplier
-              self.Ybus[noderow][nodecol] = self.Ybus[nodecol][noderow] = Yval
-              if nodecol not in YbusChanges:
-                YbusChanges[nodecol] = {}
-              YbusChanges[noderow][nodecol] = YbusChanges[nodecol][noderow] = Yval
+            # for node in self.Ybus[node2]:
+            #   Y_tr_od = - self.Ybus[node1][node2]
+            #   if node in nodes and node != node2:
+            #     Yval = self.Ybus[node][node2] * posMultiplier
+            #     self.Ybus[node][node2] = self.Ybus[node2][node] = Yval
+            #     print(node, node2, self.Ybus[node][node2])
+            #     if node not in YbusChanges:
+            #       YbusChanges[node] = {}
+            #     YbusChanges[node][node2] = YbusChanges[node2][node] = Yval
+            #   if node == node2:
+            #     Ydiag_tr = Y_tr_od / old_tap
+            #     diff = self.Ybus[node2][node2] - Ydiag_tr
+            #     self.Ybus[node2][node2] = Y_tr_od * old_tap / (new_tap ** 2) + diff
+            #     print(node2, node2, self.Ybus[node2][node2])
 
-            # for the diagonal element, apply posMultiplier a 2nd time
+            # for the diagonal element, apply posMultiplier a 2nd time. Note the contribution from other connected component
             # to square the value
-            Yval = self.Ybus[noderow][noderow] * posMultiplier
-            self.Ybus[noderow][noderow] = Yval
-            YbusChanges[noderow][noderow] = Yval
+            # Yval = self.Ybus[node2][node2] * posMultiplier
+            # self.Ybus[node2][node2] = Yval
+            # YbusChanges[node2][node2] = Yval
 
         except:
           if mrid not in msgdict['measurements']:
@@ -292,7 +327,6 @@ class SimWrapper(object):
               if noderow not in YbusChanges:
                 YbusChanges[noderow] = {}
               YbusChanges[noderow][noderow] = self.Ybus[noderow][noderow]
-
 
           elif value == 1: # on
             if self.CapacitorLastValue[noderow] == 0:
@@ -321,14 +355,41 @@ class SimWrapper(object):
 def nodes_to_update(sparql_mgr):
     print('\nFinding nodes to track for Ybus updates...', flush=True)
 
-    bindings = sparql_mgr.SwitchingEquipment_switch_names()
+    phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
 
+    bindings = sparql_mgr.SwitchingEquipment_switch_names()
     switchToBuses = {}
     for obj in bindings:
       sw_name = obj['sw_name']['value']
       bus1 = obj['bus1']['value'].upper()
       bus2 = obj['bus2']['value'].upper()
       switchToBuses[sw_name] = [bus1, bus2]
+
+    bindings = sparql_mgr.TransformerTank_xfmr_names()
+    xfmrtoBuses = {}
+    Buses = {}
+    Phases = {}
+    baseV = {}
+    for obj in bindings:
+      xfmr_name = obj['xfmr_name']['value']
+      enum = int(obj['enum']['value'])
+      if xfmr_name not in Buses:
+        Buses[xfmr_name] = {}
+        Phases[xfmr_name] = {}
+        baseV[xfmr_name] = {}
+      Buses[xfmr_name][enum] = obj['bus']['value'].upper()
+      Phases[xfmr_name] = obj['phase']['value']
+      baseV[xfmr_name][enum] = obj['baseV']['value']
+
+    Nodes = {}
+    for bus in Buses:
+      # For regulator, the terminal base voltage should be equal
+      if baseV[bus][1] == baseV[bus][2]:
+        node1 = Buses[bus][1] + phaseToIdx[Phases[bus]]
+        node2 = Buses[bus][2] + phaseToIdx[Phases[bus]]
+        Nodes[node1] = Nodes[node2] = {}
+        Nodes[node1]['conn'] = node2
+        Nodes[node2]['conn'] = node1
 
     # Get the per capacitor Ybus contributions
     bindings = sparql_mgr.ShuntElement_cap_names()
@@ -341,10 +402,8 @@ def nodes_to_update(sparql_mgr):
 
     feeders = sparql_mgr.cim_export()
 
-    phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
-
     SwitchMridToNodes = {}
-    TransformerMridToNode = {}
+    TransformerMridToNodes = {}
     TransformerLastPos = {}
     CapacitorMridToNode = {}
     CapacitorLastValue = {}
@@ -365,11 +424,12 @@ def nodes_to_update(sparql_mgr):
               SwitchMridToNodes[mrid] = [node1, node2]
               print('Switch mrid: ' + mrid + ', nodes: ' + str(SwitchMridToNodes[mrid]), flush=True)
           elif meas['ConductingEquipment_type'] == 'PowerTransformer':
-            node = meas['ConnectivityNode'] + phaseToIdx[phase]
-            node = node.upper()
-            TransformerMridToNode[mrid] = node
-            TransformerLastPos[node] = 0
-            print('Transformer mrid: ' + mrid + ', node: ' + node, flush=True)
+            node =  meas['ConnectivityNode'] + phaseToIdx[phase]
+            node2 = node.upper()
+            node1 = Nodes[node2]['conn']
+            TransformerMridToNodes[mrid] = [node1, node2]
+            TransformerLastPos[node2] = 0
+            print('Transformer mrid: ' + mrid + ', nodes: ' + str(TransformerMridToNodes[mrid]), flush=True)
           elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
             node = meas['ConnectivityNode'] + phaseToIdx[phase]
             node = node.upper()
@@ -393,7 +453,7 @@ def nodes_to_update(sparql_mgr):
     #pprint.pprint(CapacitorMridToNode)
     #pprint.pprint(CapacitorMridToYbusContrib)
 
-    return SwitchMridToNodes,TransformerMridToNode,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue
+    return SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue
 
 
 def opendss_ybus(sparql_mgr):
@@ -434,7 +494,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
   sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-  SwitchMridToNodes,TransformerMridToNode,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
+  SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
 
   # Get starting Ybus from static_ybus module
   mod_import = importlib.import_module('static-ybus.static_ybus')
@@ -444,7 +504,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   # Get node to index mapping from OpenDSS
   NodeIndex = opendss_ybus(sparql_mgr)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNode, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
+  simRap = SimWrapper(gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
@@ -478,8 +538,10 @@ def _main():
   feeder_mrid = sim_request["power_system_config"]["Line_name"]
   simulation_id = opts.simid
 
-  log_file = open('dynamic_ybus.log', 'w')
+  #simulation_id = "1423134294"
+  #feeder_mrid = "_5B816B93-7A5F-B64C-8460-47C17D6E4B0F"
 
+  log_file = open('dynamic_ybus.log', 'w')
   dynamic_ybus(log_file, feeder_mrid, simulation_id)
 
 
