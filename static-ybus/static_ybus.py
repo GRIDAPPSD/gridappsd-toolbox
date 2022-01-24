@@ -891,7 +891,7 @@ def fill_Ybus_PowerTransformerEnd_xfmrs(sparql_mgr, Ybus):
             bus2 = Bus[xfmr_name][2]
             bus3 = obj['bus']['value'].upper()
             print('\n*** WARNING: 3-winding, 3-phase PowerTransformerEnd transformers are not supported, xfmr: ' + xfmr_name + ', bus1: ' + bus1 + ', bus2: ' + bus2 + ', bus3: ' + bus3 + '\n', flush=True)
-            Unsupported[bus1] = Unsupported[bus2] = Unsupported[bus3] = [(bus1, bus2, bus3), '3-winding 3-phase transformer']
+            #Unsupported[bus1] = Unsupported[bus2] = Unsupported[bus3] = [(bus1, bus2, bus3), '3-winding 3-phase transformer']
 
             # need to clear out the previous dictionary entries for this
             # 3-winding transformer so it isn't processed below
