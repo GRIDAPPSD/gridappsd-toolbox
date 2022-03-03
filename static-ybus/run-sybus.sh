@@ -16,7 +16,7 @@ if [[ -z "$SIMREQ" ]]; then
         exit
     fi
 
-    read -d "\n" SIMREQ <<< $(sim_starter/sim_starter.py $1 nosim)
+    read -d "\n" SIMREQ <<< $(../sim_starter/sim_starter.py $1 nosim)
 fi
 
 python3 ./static_ybus.py --request "$SIMREQ" 2>&1
