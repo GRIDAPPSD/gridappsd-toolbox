@@ -75,7 +75,7 @@ Optional command line arguments:
 
     appName = sys.argv[0]
 
-    sim_config_file = './sim_starter/' + sys.argv[1] + '-config.json'
+    sim_config_file = '../sim_starter/' + sys.argv[1] + '-config.json'
     gapps = GridAPPSD()
 
     with open(sim_config_file) as config_fp:
