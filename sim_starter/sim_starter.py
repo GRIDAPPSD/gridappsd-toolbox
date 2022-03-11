@@ -49,6 +49,8 @@ __version__ = '0.1.0'
 
 import sys
 import json
+from inspect import getsourcefile
+from os.path import abspath, dirname
 
 # gridappsd-python module
 from gridappsd import GridAPPSD
@@ -75,7 +77,8 @@ Optional command line arguments:
 
     appName = sys.argv[0]
 
-    sim_config_file = '../sim_starter/' + sys.argv[1] + '-config.json'
+    cwd = dirname(abspath(getsourcefile(lambda:0))) # magic to get current dir
+    sim_config_file = cwd + '/' + sys.argv[1] + '-config.json'
     gapps = GridAPPSD()
 
     with open(sim_config_file) as config_fp:
