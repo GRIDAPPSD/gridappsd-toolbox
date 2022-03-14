@@ -440,74 +440,81 @@ def nodes_to_update(sparql_mgr):
     return SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue
 
 
-def opendss_ybus(sparql_mgr):
-  yParse,nodeList = sparql_mgr.ybus_export()
+class DynamicYbus(GridAPPSD):
 
-  idx = 1
-  #Nodes = {}
-  NodeIndex = {}
-  for obj in nodeList:
-    #Nodes[idx] = obj.strip('\"')
-    NodeIndex[obj.strip('\"')] = idx
-    idx += 1
-  #pprint.pprint(Nodes)
-  #pprint.pprint(NodeIndex)
+  def opendss_ybus(self, sparql_mgr):
+    yParse,nodeList = sparql_mgr.ybus_export()
 
-  #Ybus = {}
-  #for obj in yParse:
-  #  items = obj.split(',')
-  #  if items[0] == 'Row':
-  #    continue
-  #  if Nodes[int(items[0])] not in Ybus:
-  #    Ybus[Nodes[int(items[0])]] = {}
-  #  if Nodes[int(items[1])] not in Ybus:
-  #    Ybus[Nodes[int(items[1])]] = {}
-  #  Ybus[Nodes[int(items[0])]][Nodes[int(items[1])]] = Ybus[Nodes[int(items[1])]][Nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
-  #pprint.pprint(Ybus)
+    idx = 1
+    #Nodes = {}
+    NodeIndex = {}
+    for obj in nodeList:
+      #Nodes[idx] = obj.strip('\"')
+      NodeIndex[obj.strip('\"')] = idx
+      idx += 1
+    #pprint.pprint(Nodes)
+    #pprint.pprint(NodeIndex)
 
-  #return Ybus
-  return NodeIndex
+    #Ybus = {}
+    #for obj in yParse:
+    #  items = obj.split(',')
+    #  if items[0] == 'Row':
+    #    continue
+    #  if Nodes[int(items[0])] not in Ybus:
+    #    Ybus[Nodes[int(items[0])]] = {}
+    #  if Nodes[int(items[1])] not in Ybus:
+    #    Ybus[Nodes[int(items[1])]] = {}
+    #  Ybus[Nodes[int(items[0])]][Nodes[int(items[1])]] = Ybus[Nodes[int(items[1])]][Nodes[int(items[0])]] = complex(float(items[2]), float(items[3]))
+    #pprint.pprint(Ybus)
 
-
-def dynamic_ybus(log_file, feeder_mrid, simulation_id):
-  global logfile
-  logfile = log_file
-
-  gapps = GridAPPSD()
-
-  SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
-  sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
-
-  SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
-
-  # Get starting Ybus from static_ybus module
-  mod_import = importlib.import_module('static-ybus.static_ybus')
-  static_ybus_func = getattr(mod_import, 'static_ybus')
-  Ybus = static_ybus_func(feeder_mrid)
-
-  # Hold here for demo
-  #text = input('\nWait here...')
-
-  # Get node to index mapping from OpenDSS
-  NodeIndex = opendss_ybus(sparql_mgr)
-
-  simRap = SimWrapper(gapps, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
-  conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
-  conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
+    #return Ybus
+    return NodeIndex
 
 
-  print('Starting simulation monitoring loop....', flush=True)
+  #def on_message(self, headers, message):
 
-  while simRap.keepLooping():
-    #print('Sleeping....', flush=True)
-    time.sleep(0.1)
 
-  print('Finished simulation monitoring loop and Dynamic Ybus\n', flush=True)
+  def __init__(self, log_file, feeder_mrid, simulation_id):
+    global logfile
+    logfile = log_file
 
-  gapps.unsubscribe(conn_id1)
-  gapps.unsubscribe(conn_id2)
+    gapps = GridAPPSD()
 
-  return
+    SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
+    sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
+
+    #topic = 'goss.gridappsd.request.data.ybus'
+    #gapps.subscribe(topic, on_message)
+
+    SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
+
+    # Get starting Ybus from static_ybus module
+    mod_import = importlib.import_module('static-ybus.static_ybus')
+    static_ybus_func = getattr(mod_import, 'static_ybus')
+    Ybus = static_ybus_func(feeder_mrid)
+
+    # Hold here for demo
+    #text = input('\nWait here...')
+
+    # Get node to index mapping from OpenDSS
+    NodeIndex = self.opendss_ybus(sparql_mgr)
+
+    simRap = SimWrapper(gapps, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
+    conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
+    conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
+
+    print('Starting simulation monitoring loop....', flush=True)
+
+    while simRap.keepLooping():
+      #print('Sleeping....', flush=True)
+      time.sleep(0.1)
+
+    print('Finished simulation monitoring loop and Dynamic Ybus\n', flush=True)
+
+    gapps.unsubscribe(conn_id1)
+    gapps.unsubscribe(conn_id2)
+
+    return
 
 
 def _main():
@@ -530,7 +537,8 @@ def _main():
   #feeder_mrid = "_5B816B93-7A5F-B64C-8460-47C17D6E4B0F"
 
   log_file = open('dynamic_ybus.log', 'w')
-  dynamic_ybus(log_file, feeder_mrid, simulation_id)
+
+  dynamic_ybus = DynamicYbus(log_file, feeder_mrid, simulation_id)
 
 
 if __name__ == "__main__":
