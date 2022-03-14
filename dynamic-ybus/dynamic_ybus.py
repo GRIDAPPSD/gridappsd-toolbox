@@ -131,7 +131,7 @@ class SimWrapper(object):
     return YbusUncomplex
 
 
-  def publish(self, YbusChanges, timestamp):
+  def publish(self, YbusChanges):
     #print('\nYbusChanges lower diagonal:', flush=True)
     #self.printLower(YbusChanges)
     #print('Full Ybus lower diagonal:', flush=True)
@@ -142,7 +142,7 @@ class SimWrapper(object):
     lowerChanges = self.lowerUncomplex(YbusChanges)
     message = {
       'feeder_id': self.feeder_mrid,
-      'timestamp': timestamp,
+      'timestamp': self.timestamp,
       'ybus': lowerChanges
     }
     self.gapps.send(self.publish_to_topic_changes, message)
@@ -153,7 +153,7 @@ class SimWrapper(object):
     lowerFull = self.lowerUncomplex(self.Ybus)
     message = {
       'feeder_id': self.feeder_mrid,
-      'timestamp': timestamp,
+      'timestamp': self.timestamp,
       'ybus': lowerFull
     }
     self.gapps.send(self.publish_to_topic_full, message)
@@ -174,8 +174,8 @@ class SimWrapper(object):
 
     else:
       msgdict = message['message']
-      ts = msgdict['timestamp']
-      print('Processing simulation timestamp: ' + str(ts), flush=True)
+      self.timestamp = msgdict['timestamp']
+      print('Processing simulation timestamp: ' + str(self.timestamp), flush=True)
 
       # Questions:
       # 1. HOLD Do we need to publish an index number based version of Ybus
@@ -247,11 +247,11 @@ class SimWrapper(object):
 
         except:
           if mrid not in msgdict['measurements']:
-            print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
           elif 'value' not in msgdict['measurements'][mrid]:
-            print('*** WARNING: Did not find value element for switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Did not find value element for switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
           else:
-            print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
 
       # Transformer processing
       for mrid in self.TransformerMridToNodes:
@@ -288,11 +288,11 @@ class SimWrapper(object):
 
         except:
           if mrid not in msgdict['measurements']:
-            print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
           elif 'value' not in msgdict['measurements'][mrid]:
-            print('*** WARNING: Did not find value element for transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Did not find value element for transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
           else:
-            print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
 
       # Capacitor (LinearShuntCompensator) processing
       for mrid in self.CapacitorMridToNode:
@@ -320,15 +320,15 @@ class SimWrapper(object):
 
         except:
           if mrid not in msgdict['measurements']:
-            print('*** WARNING: Did not find capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Did not find capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
           elif 'value' not in msgdict['measurements'][mrid]:
-            print('*** WARNING: Did not find value element for capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Did not find value element for capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
           else:
-            print('*** WARNING: Unknown exception processing capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
+            print('*** WARNING: Unknown exception processing capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
 
       if len(YbusChanges) > 0: # Ybus changed if there are any entries
         print('*** Ybus changed so I will publish full Ybus and YbusChanges!', flush=True)
-        self.publish(YbusChanges, ts)
+        self.publish(YbusChanges)
       else:
         print('Ybus NOT changed\n', flush=True)
 
@@ -471,7 +471,22 @@ class DynamicYbus(GridAPPSD):
     return NodeIndex
 
 
-  #def on_message(self, headers, message):
+  def on_message(self, headers, message):
+    reply_to = headers['reply-to']
+
+    if message['requestType'] == 'GET_SNAPSHOT_YBUS':
+      lowerFull = self.simRap.lowerUncomplex(self.simRap.Ybus)
+      message = {
+        'feeder_id': self.simRap.feeder_mrid,
+        'timestamp': self.simRap.timestamp,
+        'ybus': lowerFull
+      }
+      self.gapps.send(reply_to, message)
+
+    else:
+      message = "No valid requestType specified"
+      self.gapps.send(reply_to, message)
+
 
 
   def __init__(self, log_file, feeder_mrid, simulation_id):
@@ -483,8 +498,8 @@ class DynamicYbus(GridAPPSD):
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
     sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-    #topic = 'goss.gridappsd.request.data.ybus'
-    #gapps.subscribe(topic, on_message)
+    topic = 'goss.gridappsd.request.data.ybus'
+    req_id = gapps.subscribe(topic, self)
 
     SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
 
@@ -499,20 +514,21 @@ class DynamicYbus(GridAPPSD):
     # Get node to index mapping from OpenDSS
     NodeIndex = self.opendss_ybus(sparql_mgr)
 
-    simRap = SimWrapper(gapps, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
-    conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
-    conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
+    self.simRap = SimWrapper(gapps, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
+    out_id = gapps.subscribe(simulation_output_topic(simulation_id), self.simRap)
+    log_id = gapps.subscribe(simulation_log_topic(simulation_id), self.simRap)
 
     print('Starting simulation monitoring loop....', flush=True)
 
-    while simRap.keepLooping():
+    while self.simRap.keepLooping():
       #print('Sleeping....', flush=True)
       time.sleep(0.1)
 
     print('Finished simulation monitoring loop and Dynamic Ybus\n', flush=True)
 
-    gapps.unsubscribe(conn_id1)
-    gapps.unsubscribe(conn_id2)
+    gapps.unsubscribe(req_id)
+    gapps.unsubscribe(out_id)
+    gapps.unsubscribe(log_id)
 
     return
 
