@@ -54,12 +54,13 @@ import pprint
 import numpy as np
 
 from gridappsd import GridAPPSD
-from gridappsd.topics import simulation_output_topic, simulation_log_topic
+from gridappsd.topics import simulation_output_topic, simulation_log_topic, service_output_topic
 
 
 class SimWrapper(object):
-  def __init__(self, gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue):
+  def __init__(self, gapps, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue):
     self.gapps = gapps
+    self.feeder_mrid = feeder_mrid
     self.simulation_id = simulation_id
     self.Ybus = Ybus
     self.NodeIndex = NodeIndex
@@ -70,6 +71,9 @@ class SimWrapper(object):
     self.CapacitorMridToYbusContrib = CapacitorMridToYbusContrib
     self.CapacitorLastValue = CapacitorLastValue
     self.keepLoopingFlag = True
+    self.firstPublishFlag = True
+    self.publish_to_topic_full = service_output_topic('gridappsd-dynamic-ybus-full', simulation_id)
+    self.publish_to_topic_changes = service_output_topic('gridappsd-dynamic-ybus-changes', simulation_id)
 
 
   def keepLooping(self):
@@ -116,11 +120,63 @@ class SimWrapper(object):
         print('', flush=True)
 
 
-  def publish(self, YbusChanges):
-    print('\nYbus Changes lower diagonal:', flush=True)
-    self.printLower(YbusChanges)
+  def lowerUncomplex(self, YbusComplex):
+    YbusUncomplex = {}
+    for noderow in YbusComplex:
+      for nodecol,value in YbusComplex[noderow].items():
+        if self.NodeIndex[noderow] >= self.NodeIndex[nodecol]:
+          if noderow not in YbusUncomplex:
+            YbusUncomplex[noderow] = {}
+          YbusUncomplex[noderow][nodecol] = (value.real, value.imag)
+
+    return YbusUncomplex
+
+
+  def publishFullOnly(self, timestamp):
+    lowerFull = self.lowerUncomplex(self.Ybus)
+    message = {
+      'feeder_id': self.feeder_mrid,
+      'timestamp': timestamp,
+      'ybus': lowerFull
+    }
+    # publish same message to both topics so even apps that only want changes get the
+    # full Ybus as a starting point
+    self.gapps.send(self.publish_to_topic_changes, message)
+    self.gapps.send(self.publish_to_topic_full, message)
+    print('\nYbus Full published message:', flush=True)
+    print(message, flush=True)
+    print('')
+
+
+  def publishFullAndChanges(self, YbusChanges, timestamp):
+    #print('\nYbusChanges lower diagonal:', flush=True)
+    #self.printLower(YbusChanges)
     #print('Full Ybus lower diagonal:', flush=True)
     #self.printLower(self.Ybus)
+
+    # JSON can't serialize complex values so convert to a tuple of real and imaginary values
+    # while also only populating lower diagonal elements
+    lowerChanges = self.lowerUncomplex(YbusChanges)
+    message = {
+      'feeder_id': self.feeder_mrid,
+      'timestamp': timestamp,
+      'ybus': lowerChanges
+    }
+    self.gapps.send(self.publish_to_topic_changes, message)
+    print('\nYbusChanges published message:', flush=True)
+    print(message, flush=True)
+    print('')
+
+    lowerFull = self.lowerUncomplex(self.Ybus)
+    message = {
+      'feeder_id': self.feeder_mrid,
+      'timestamp': timestamp,
+      'ybus': lowerFull
+    }
+    self.gapps.send(self.publish_to_topic_full, message)
+    #print('\nYbus Full published message:', flush=True)
+    #print(message, flush=True)
+    #print('')
 
 
   def on_message(self, header, message):
@@ -288,8 +344,13 @@ class SimWrapper(object):
             print('*** WARNING: Unknown exception processing capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
       if len(YbusChanges) > 0: # Ybus changed if there are any entries
-        print('*** Ybus changed so I will publish full Ybus and minimal YbusChanges!', flush=True)
-        self.publish(YbusChanges)
+        if self.firstPublishFlag:
+          print('*** Ybus changed but I have not published so I will only publish full Ybus!', flush=True)
+          self.firstPublishFlag = False
+          self.publishFullOnly(ts)
+        else:
+          print('*** Ybus changed and I have previously published so I will publish full Ybus and YbusChanges!', flush=True)
+          self.publishFullAndChanges(YbusChanges, ts)
       else:
         print('Ybus NOT changed\n', flush=True)
 
@@ -452,7 +513,7 @@ def dynamic_ybus(log_file, feeder_mrid, simulation_id):
   # Get node to index mapping from OpenDSS
   NodeIndex = opendss_ybus(sparql_mgr)
 
-  simRap = SimWrapper(gapps, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
+  simRap = SimWrapper(gapps, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
   conn_id1 = gapps.subscribe(simulation_output_topic(simulation_id), simRap)
   conn_id2 = gapps.subscribe(simulation_log_topic(simulation_id), simRap)
 
