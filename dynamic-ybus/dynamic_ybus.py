@@ -71,7 +71,6 @@ class SimWrapper(object):
     self.CapacitorMridToYbusContrib = CapacitorMridToYbusContrib
     self.CapacitorLastValue = CapacitorLastValue
     self.keepLoopingFlag = True
-    self.firstPublishFlag = True
     self.publish_to_topic_full = service_output_topic('gridappsd-dynamic-ybus-full', simulation_id)
     self.publish_to_topic_changes = service_output_topic('gridappsd-dynamic-ybus-changes', simulation_id)
 
@@ -132,23 +131,7 @@ class SimWrapper(object):
     return YbusUncomplex
 
 
-  def publishFullOnly(self, timestamp):
-    lowerFull = self.lowerUncomplex(self.Ybus)
-    message = {
-      'feeder_id': self.feeder_mrid,
-      'timestamp': timestamp,
-      'ybus': lowerFull
-    }
-    # publish same message to both topics so even apps that only want changes get the
-    # full Ybus as a starting point
-    self.gapps.send(self.publish_to_topic_changes, message)
-    self.gapps.send(self.publish_to_topic_full, message)
-    print('\nYbus Full published message:', flush=True)
-    print(message, flush=True)
-    print('')
-
-
-  def publishFullAndChanges(self, YbusChanges, timestamp):
+  def publish(self, YbusChanges, timestamp):
     #print('\nYbusChanges lower diagonal:', flush=True)
     #self.printLower(YbusChanges)
     #print('Full Ybus lower diagonal:', flush=True)
@@ -344,13 +327,8 @@ class SimWrapper(object):
             print('*** WARNING: Unknown exception processing capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(ts), flush=True)
 
       if len(YbusChanges) > 0: # Ybus changed if there are any entries
-        if self.firstPublishFlag:
-          print('*** Ybus changed but I have not published so I will only publish full Ybus!', flush=True)
-          self.firstPublishFlag = False
-          self.publishFullOnly(ts)
-        else:
-          print('*** Ybus changed and I have previously published so I will publish full Ybus and YbusChanges!', flush=True)
-          self.publishFullAndChanges(YbusChanges, ts)
+        print('*** Ybus changed so I will publish full Ybus and YbusChanges!', flush=True)
+        self.publish(YbusChanges, ts)
       else:
         print('Ybus NOT changed\n', flush=True)
 
