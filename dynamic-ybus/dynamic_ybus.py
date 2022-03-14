@@ -62,6 +62,7 @@ class SimWrapper(object):
     self.gapps = gapps
     self.feeder_mrid = feeder_mrid
     self.simulation_id = simulation_id
+    self.timestamp = 0
     self.Ybus = Ybus
     self.NodeIndex = NodeIndex
     self.SwitchMridToNodes = SwitchMridToNodes
