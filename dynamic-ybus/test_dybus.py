@@ -26,10 +26,19 @@ def _main():
 
   gapps = GridAPPSD()
 
+  # subscribe to all the Dynamic Ybus subscriptions
   gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus-full',
                                                  simID), ybusFullCallback)
   gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus-changes',
                                                  simID), ybusChangesCallback)
+
+  # request/response for snapshot Ybus
+  topic = 'goss.gridappsd.request.data.ybus.' + simID
+  request = {
+    "requestType": "GET_SNAPSHOT_YBUS"
+  }
+  message = gapps.get_response(topic, request, timeout=90)
+  print('Got Ybus Snapshot response: ' + str(message) + '\n', flush=True)
 
   while True:
     time.sleep(0.1)
