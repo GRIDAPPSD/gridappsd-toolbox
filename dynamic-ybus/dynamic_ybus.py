@@ -143,6 +143,7 @@ class SimWrapper(object):
     lowerChanges = self.lowerUncomplex(YbusChanges)
     message = {
       'feeder_id': self.feeder_mrid,
+      'simulation_id': self.simulation_id,
       'timestamp': self.timestamp,
       'ybus': lowerChanges
     }
@@ -154,6 +155,7 @@ class SimWrapper(object):
     lowerFull = self.lowerUncomplex(self.Ybus)
     message = {
       'feeder_id': self.feeder_mrid,
+      'simulation_id': self.simulation_id,
       'timestamp': self.timestamp,
       'ybus': lowerFull
     }
@@ -479,6 +481,7 @@ class DynamicYbus(GridAPPSD):
       lowerFull = self.simRap.lowerUncomplex(self.simRap.Ybus)
       message = {
         'feeder_id': self.simRap.feeder_mrid,
+        'simulation_id': self.simRap.simulation_id,
         'timestamp': self.simRap.timestamp,
         'ybus': lowerFull
       }
@@ -487,7 +490,6 @@ class DynamicYbus(GridAPPSD):
     else:
       message = "No valid requestType specified"
       self.gapps.send(reply_to, message)
-
 
 
   def __init__(self, log_file, feeder_mrid, simulation_id):
@@ -499,7 +501,7 @@ class DynamicYbus(GridAPPSD):
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
     sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
-    topic = 'goss.gridappsd.request.data.ybus'
+    topic = 'goss.gridappsd.request.data.ybus.' + simulation_id
     req_id = gapps.subscribe(topic, self)
 
     SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
