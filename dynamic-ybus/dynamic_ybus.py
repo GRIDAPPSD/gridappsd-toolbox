@@ -185,20 +185,9 @@ class SimWrapper(object):
       #    vs. just the node name based version? Ans:  Don't think so as index
       #    is just an artifact of the node list order and not meaningful.
       #    Shiva thinks I should publish an index based version so need to
-      #    combe back to this
+      #    come back to this
 
-      # 2. HOLD Should the ActiveMQ message format for Ybus just be the "sparse"
-      #    dictionary of dictionaries? Ans: Yes
-
-      # 3. HOLD Should the real and imaginary components of complex Ybus values
-      #    be two separate floating point values in the published message
-      #    instead of some complex number representation? Ans: If JSON directly
-      #    supports complex number representation vs. some ugly string
-      #    conversion then do it as complex.  Otherwise, separate the
-      #    components into floats. Based on googling, it looks like JSON has
-      #    no direct support for complex numbers so need to separate components
-
-      # 4. HOLD Andy talked about creating a separate Ybus for each feeder and
+      # 2. HOLD Andy talked about creating a separate Ybus for each feeder and
       #    island.  Right now I have only a monolithic Ybus so need to come
       #    back and get more guidance on this.  Perhaps this is related to
       #    making dynamic YBus aware of Topology Processor as I'm not sure
