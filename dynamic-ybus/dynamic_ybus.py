@@ -485,11 +485,11 @@ class DynamicYbus(GridAPPSD):
         'timestamp': self.simRap.timestamp,
         'ybus': lowerFull
       }
-      self.gapps.send(reply_to, message)
+      self.simRap.gapps.send(reply_to, message)
 
     else:
       message = "No valid requestType specified"
-      self.gapps.send(reply_to, message)
+      self.simRap.gapps.send(reply_to, message)
 
 
   def __init__(self, log_file, feeder_mrid, simulation_id):
@@ -500,9 +500,6 @@ class DynamicYbus(GridAPPSD):
 
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
     sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
-
-    topic = 'goss.gridappsd.request.data.ybus.' + simulation_id
-    req_id = gapps.subscribe(topic, self)
 
     SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
 
@@ -518,6 +515,12 @@ class DynamicYbus(GridAPPSD):
     NodeIndex = self.opendss_ybus(sparql_mgr)
 
     self.simRap = SimWrapper(gapps, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
+
+    # don't subscribe to handle snapshot requests until we have an initial
+    # Ybus to provide from the SimWrapper class
+    topic = 'goss.gridappsd.request.data.ybus.' + simulation_id
+    req_id = gapps.subscribe(topic, self)
+
     out_id = gapps.subscribe(simulation_output_topic(simulation_id), self.simRap)
     log_id = gapps.subscribe(simulation_log_topic(simulation_id), self.simRap)
 
