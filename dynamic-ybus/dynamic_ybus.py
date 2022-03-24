@@ -495,7 +495,7 @@ class DynamicYbus(GridAPPSD):
     # Get starting Ybus from static_ybus module
     mod_import = importlib.import_module('static-ybus.static_ybus')
     static_ybus_func = getattr(mod_import, 'static_ybus')
-    Ybus = static_ybus_func(feeder_mrid)
+    Ybus = static_ybus_func(gapps, feeder_mrid)
 
     # Hold here for demo
     #text = input('\nWait here...')
