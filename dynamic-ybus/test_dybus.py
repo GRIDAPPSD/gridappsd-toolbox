@@ -33,7 +33,7 @@ def _main():
                                                  simID), ybusChangesCallback)
 
   # request/response for snapshot Ybus
-  topic = 'goss.gridappsd.request.data.ybus.' + simID
+  topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simID
   request = {
     "requestType": "GET_SNAPSHOT_YBUS"
   }

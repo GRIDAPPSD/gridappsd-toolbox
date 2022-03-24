@@ -507,7 +507,7 @@ class DynamicYbus(GridAPPSD):
 
     # don't subscribe to handle snapshot requests until we have an initial
     # Ybus to provide from the SimWrapper class
-    topic = 'goss.gridappsd.request.data.ybus.' + simulation_id
+    topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simulation_id
     req_id = gapps.subscribe(topic, self)
 
     out_id = gapps.subscribe(simulation_output_topic(simulation_id), self.simRap)
