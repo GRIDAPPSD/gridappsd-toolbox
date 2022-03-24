@@ -1564,10 +1564,8 @@ def count_unique_ybus(Ybus):
     return count
 
 
-def static_ybus(feeder_mrid):
+def static_ybus(gapps, feeder_mrid):
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
-
-    gapps = GridAPPSD()
 
     sparql_mgr = SPARQLManager(gapps, feeder_mrid)
 
@@ -1629,7 +1627,9 @@ def _main():
     sim_request = json.loads(opts.request.replace("\'",""))
     feeder_mrid = sim_request["power_system_config"]["Line_name"]
 
-    Ybus = static_ybus(feeder_mrid)
+    gapps = GridAPPSD()
+
+    Ybus = static_ybus(gapps, feeder_mrid)
 
 
 if __name__ == "__main__":
