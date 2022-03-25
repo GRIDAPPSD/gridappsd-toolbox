@@ -1569,7 +1569,7 @@ def static_ybus(gapps, feeder_mrid):
 
     sparql_mgr = SPARQLManager(gapps, feeder_mrid)
 
-    print('\nStarting to build static Ybus...', flush=True)
+    print('\nStarting to build static Ybus for feeder_id: ' + feeder_mrid + '...', flush=True)
 
     Ybus = {}
 
