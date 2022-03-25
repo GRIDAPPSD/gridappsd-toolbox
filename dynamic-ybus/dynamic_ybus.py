@@ -486,6 +486,8 @@ class DynamicYbus(GridAPPSD):
 
     for noderow in fullUncomplex:
       for nodecol,value in fullUncomplex[noderow].items():
+        if noderow not in YbusComplex:
+          YbusComplex[noderow] = {}
         YbusComplex[noderow][nodecol] = complex(value[0], value[1])
 
     return YbusComplex
@@ -512,7 +514,7 @@ class DynamicYbus(GridAPPSD):
         "feeder_id": feeder_mrid
       }
       message = gapps.get_response(topic, request, timeout=90)
-      print('Got Ybus Snapshot response: ' + str(message) + '\n', flush=True)
+      print('Got Ybus snapshot response: ' + str(message) + '\n', flush=True)
       Ybus = self.fullComplex(message['ybus'])
 
     else:
