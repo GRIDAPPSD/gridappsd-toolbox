@@ -467,18 +467,28 @@ class DynamicYbus(GridAPPSD):
     reply_to = headers['reply-to']
 
     if message['requestType'] == 'GET_SNAPSHOT_YBUS':
-      lowerFull = self.simRap.lowerUncomplex(self.simRap.Ybus)
+      lowerUncomplex = self.simRap.lowerUncomplex(self.simRap.Ybus)
       message = {
         'feeder_id': self.simRap.feeder_mrid,
         'simulation_id': self.simRap.simulation_id,
         'timestamp': self.simRap.timestamp,
-        'ybus': lowerFull
+        'ybus': lowerUncomplex
       }
       self.simRap.gapps.send(reply_to, message)
 
     else:
       message = "No valid requestType specified"
       self.simRap.gapps.send(reply_to, message)
+
+
+  def fullComplex(self, fullUncomplex):
+    YbusComplex = {}
+
+    for noderow in fullUncomplex:
+      for nodecol,value in fullUncomplex[noderow].items():
+        YbusComplex[noderow][nodecol] = complex(value[0], value[1])
+
+    return YbusComplex
 
 
   def __init__(self, log_file, feeder_mrid, simulation_id):
@@ -493,9 +503,22 @@ class DynamicYbus(GridAPPSD):
     SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
 
     # Get starting Ybus from static_ybus module
-    mod_import = importlib.import_module('static-ybus.static_ybus')
-    static_ybus_func = getattr(mod_import, 'static_ybus')
-    Ybus = static_ybus_func(gapps, feeder_mrid)
+    serviceFlag = False
+    if serviceFlag:
+      # request/response for snapshot Ybus
+      topic = 'goss.gridappsd.request.data.static-ybus'
+      request = {
+        "requestType": "GET_SNAPSHOT_YBUS",
+        "feeder_id": feeder_mrid
+      }
+      message = gapps.get_response(topic, request, timeout=90)
+      print('Got Ybus Snapshot response: ' + str(message) + '\n', flush=True)
+      Ybus = self.fullComplex(message['ybus'])
+
+    else:
+      mod_import = importlib.import_module('static-ybus.static_ybus')
+      static_ybus_func = getattr(mod_import, 'static_ybus')
+      Ybus = static_ybus_func(gapps, feeder_mrid)
 
     # Hold here for demo
     #text = input('\nWait here...')
