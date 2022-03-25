@@ -79,8 +79,6 @@ def PerLengthPhaseImpedance_line_configs(gapps, feeder_mrid):
      """% feeder_mrid
 
     print('*** in query, before query_data',flush=True)
-    print(gapps,flush=True)
-    print(feeder_mrid,flush=True)
     results = gapps.query_data(VALUES_QUERY)
     print('*** GOT QUERY RESULTS!!!',flush=True)
     bindings = results['data']['results']['bindings']
