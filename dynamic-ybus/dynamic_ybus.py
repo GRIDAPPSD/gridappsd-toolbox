@@ -481,14 +481,16 @@ class DynamicYbus(GridAPPSD):
       self.simRap.gapps.send(reply_to, message)
 
 
-  def fullComplex(self, fullUncomplex):
+  def fullComplex(self, lowerUncomplex):
     YbusComplex = {}
 
-    for noderow in fullUncomplex:
-      for nodecol,value in fullUncomplex[noderow].items():
+    for noderow in lowerUncomplex:
+      for nodecol,value in lowerUncomplex[noderow].items():
         if noderow not in YbusComplex:
           YbusComplex[noderow] = {}
-        YbusComplex[noderow][nodecol] = complex(value[0], value[1])
+        if nodecol not in YbusComplex:
+          YbusComplex[nodecol] = {}
+        YbusComplex[noderow][nodecol] = YbusComplex[nodecol][noderow] = complex(value[0], value[1])
 
     return YbusComplex
 
@@ -513,6 +515,7 @@ class DynamicYbus(GridAPPSD):
         "requestType": "GET_SNAPSHOT_YBUS",
         "feeder_id": feeder_mrid
       }
+      print('Requesting static Ybus snapshot for feeder_id: ' + feeder_mrid + '\n', flush=True)
       message = gapps.get_response(topic, request, timeout=90)
       print('Got Ybus snapshot response: ' + str(message) + '\n', flush=True)
       Ybus = self.fullComplex(message['ybus'])
