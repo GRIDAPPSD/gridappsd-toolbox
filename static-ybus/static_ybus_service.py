@@ -55,35 +55,6 @@ import numpy as np
 
 from gridappsd import GridAPPSD
 
-def PerLengthPhaseImpedance_line_configs(gapps, feeder_mrid):
-    VALUES_QUERY = """
-    PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-    PREFIX c:  <http://iec.ch/TC57/CIM100#>
-    SELECT DISTINCT ?line_config ?count ?row ?col ?r_ohm_per_m ?x_ohm_per_m ?b_S_per_m WHERE {
-    VALUES ?fdrid {"%s"}
-     ?eq r:type c:ACLineSegment.
-     ?eq c:Equipment.EquipmentContainer ?fdr.
-     ?fdr c:IdentifiedObject.mRID ?fdrid.
-     ?eq c:ACLineSegment.PerLengthImpedance ?s.
-     ?s r:type c:PerLengthPhaseImpedance.
-     ?s c:IdentifiedObject.name ?line_config.
-     ?s c:PerLengthPhaseImpedance.conductorCount ?count.
-     ?elm c:PhaseImpedanceData.PhaseImpedance ?s.
-     ?elm c:PhaseImpedanceData.row ?row.
-     ?elm c:PhaseImpedanceData.column ?col.
-     ?elm c:PhaseImpedanceData.r ?r_ohm_per_m.
-     ?elm c:PhaseImpedanceData.x ?x_ohm_per_m.
-     ?elm c:PhaseImpedanceData.b ?b_S_per_m
-    }
-    ORDER BY ?line_config ?row ?col
-     """% feeder_mrid
-
-    print('*** in query, before query_data',flush=True)
-    results = gapps.query_data(VALUES_QUERY)
-    print('*** GOT QUERY RESULTS!!!',flush=True)
-    bindings = results['data']['results']['bindings']
-    return bindings
-
 
 class StaticYbus(GridAPPSD):
 
@@ -91,9 +62,13 @@ class StaticYbus(GridAPPSD):
         self.Ybuses = {}
 
         self.gapps = GridAPPSD()
-        print(self.gapps,flush=True)
 
-        PerLengthPhaseImpedance_line_configs(self.gapps, '_5B816B93-7A5F-B64C-8460-47C17D6E4B0F')
+        # UGH!!!  Need to create a second GridAPPSD instance in order to
+        # avoid deadlock if trying to use the existing one for the queries
+        # done inside the static_ybus function from the request message
+        # handler. This cost me about 6 hours of hitting my head on a wall
+        # before I figured it out.
+        self.query_gapps = GridAPPSD()
 
         topic = 'goss.gridappsd.request.data.static-ybus'
         req_id = self.gapps.subscribe(topic, self)
@@ -122,18 +97,15 @@ class StaticYbus(GridAPPSD):
 
 
     def on_message(self, headers, message):
-        print(self.gapps,flush=True)
-
         reply_to = headers['reply-to']
 
         if message['requestType'] == 'GET_SNAPSHOT_YBUS':
-            PerLengthPhaseImpedance_line_configs(self.gapps, '_5B816B93-7A5F-B64C-8460-47C17D6E4B0F')
             feeder_mrid = message['feeder_id']
 
             if feeder_mrid not in self.Ybuses:
                 mod_import = importlib.import_module('static-ybus.static_ybus')
                 static_ybus_func = getattr(mod_import, 'static_ybus')
-                Ybus = static_ybus_func(self.gapps, feeder_mrid)
+                Ybus = static_ybus_func(self.query_gapps, feeder_mrid)
 
                 fullUncomplex = self.fullUncomplex(Ybus)
                 self.Ybuses[feeder_mrid] = fullUncomplex
