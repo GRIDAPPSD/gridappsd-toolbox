@@ -1602,10 +1602,10 @@ def static_ybus(gapps, feeder_mrid):
     #print(Ybus)
     print('\nShunt_element contributions added (no new entries)', flush=True)
 
-    print('\nFull static Ybus:')
-    for bus1 in Ybus:
-        for bus2 in Ybus[bus1]:
-            print(bus1 + ',' + bus2 + ',' + str(Ybus[bus1][bus2].real) + ',' + str(Ybus[bus1][bus2].imag))
+    #print('\nFull static Ybus:')
+    #for bus1 in Ybus:
+    #    for bus2 in Ybus[bus1]:
+    #        print(bus1 + ',' + bus2 + ',' + str(Ybus[bus1][bus2].real) + ',' + str(Ybus[bus1][bus2].imag))
 
     ysysCount = count_unique_ybus(Ybus)
     print('\nTotal static Ybus # entries: ' + str(ysysCount) + '\n', flush=True)
