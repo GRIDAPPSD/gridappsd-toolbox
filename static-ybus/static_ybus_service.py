@@ -73,7 +73,7 @@ class StaticYbus(GridAPPSD):
         topic = 'goss.gridappsd.request.data.static-ybus'
         req_id = self.gapps.subscribe(topic, self)
 
-        print('Starting Static Ybus request processing loop...\n', flush=True)
+        print('Starting Static Ybus request processing loop...', flush=True)
 
         while True:
             #print('Sleeping....', flush=True)
@@ -84,14 +84,15 @@ class StaticYbus(GridAPPSD):
         gapps.unsubscribe(req_id)
 
 
-    def fullUncomplex(self, YbusComplex):
+    def lowerUncomplex(self, YbusComplex, NodeIndex):
         YbusUncomplex = {}
 
         for noderow in YbusComplex:
             for nodecol,value in YbusComplex[noderow].items():
-                if noderow not in YbusUncomplex:
-                    YbusUncomplex[noderow] = {}
-                YbusUncomplex[noderow][nodecol] = (value.real, value.imag)
+                if NodeIndex[noderow] >= NodeIndex[nodecol]:
+                    if noderow not in YbusUncomplex:
+                        YbusUncomplex[noderow] = {}
+                    YbusUncomplex[noderow][nodecol] = (value.real, value.imag)
 
         return YbusUncomplex
 
@@ -107,16 +108,31 @@ class StaticYbus(GridAPPSD):
                 static_ybus_func = getattr(mod_import, 'static_ybus')
                 Ybus = static_ybus_func(self.query_gapps, feeder_mrid)
 
-                fullUncomplex = self.fullUncomplex(Ybus)
-                self.Ybuses[feeder_mrid] = fullUncomplex
-                print('Responding with newly created static Ybus\n', flush=True)
+                # need node indices to create lower diagonal matrix
+                message = {
+                  "configurationType": "YBus Export",
+                  "parameters": {
+                      "model_id": feeder_mrid}
+                }
+                results = self.query_gapps.get_response("goss.gridappsd.process.request.config", message, timeout=1200)
+                nodeList = results['data']['nodeList']
+
+                idx = 1
+                NodeIndex = {}
+                for obj in nodeList:
+                  NodeIndex[obj.strip('\"')] = idx
+                  idx += 1
+
+                lowerUncomplex = self.lowerUncomplex(Ybus, NodeIndex)
+                self.Ybuses[feeder_mrid] = lowerUncomplex
+                print('Responding with newly created static Ybus for feeder_id: ' + feeder_mrid + '\n', flush=True)
             else:
-                fullUncomplex = self.Ybuses[feeder_mrid]
-                print('Responding with previously created static Ybus\n', flush=True)
+                lowerUncomplex = self.Ybuses[feeder_mrid]
+                print('Responding with previously created static Ybus for feeder_id: ' + feeder_mrid + '\n', flush=True)
 
             message = {
                 'feeder_id': feeder_mrid,
-                'ybus': fullUncomplex
+                'ybus': lowerUncomplex
             }
             self.gapps.send(reply_to, message)
 
