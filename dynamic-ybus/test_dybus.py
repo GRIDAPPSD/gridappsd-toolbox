@@ -48,8 +48,9 @@ def _main():
   request = {
     "requestType": "GET_SNAPSHOT_YBUS"
   }
+  print('Requesting dynamic Ybus snapshot for sim_id: ' + simID + '\n', flush=True)
   message = gapps.get_response(topic, request, timeout=90)
-  print('Got Ybus snapshot response: ' + str(message) + '\n', flush=True)
+  print('Got dynamic Ybus snapshot response: ' + str(message) + '\n', flush=True)
 
   YbusInitializedFlag = True
 
