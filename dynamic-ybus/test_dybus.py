@@ -7,16 +7,27 @@ import time
 from gridappsd import GridAPPSD
 from gridappsd.topics import simulation_output_topic, service_output_topic
 
+YbusInitializedFlag = False
+
 
 def ybusFullCallback(header, message):
-  print('Received Ybus Full message: ' + str(message) + '\n', flush=True)
+  if not YbusInitializedFlag:
+    return
+
+  #print('Received Ybus Full message: ' + str(message) + '\n', flush=True)
+  print('Received Ybus Full message\n', flush=True)
 
 
 def ybusChangesCallback(header, message):
+  if not YbusInitializedFlag:
+    return
+
   print('Received Ybus Changes message: ' + str(message) + '\n', flush=True)
 
 
 def _main():
+  global YbusInitializedFlag
+
   if len(sys.argv) < 2:
     usestr =  '\nUsage: ' + sys.argv[0] + ' simID\n' 
     print(usestr, flush=True)
@@ -38,14 +49,14 @@ def _main():
     "requestType": "GET_SNAPSHOT_YBUS"
   }
   message = gapps.get_response(topic, request, timeout=90)
-  print('Got Ybus Snapshot response: ' + str(message) + '\n', flush=True)
+  print('Got Ybus snapshot response: ' + str(message) + '\n', flush=True)
+
+  YbusInitializedFlag = True
 
   while True:
     time.sleep(0.1)
 
   gapps.disconnect()
-
-
 
 
 if __name__ == '__main__':
