@@ -109,8 +109,10 @@ class StaticYbus(GridAPPSD):
 
                 fullUncomplex = self.fullUncomplex(Ybus)
                 self.Ybuses[feeder_mrid] = fullUncomplex
+                print('Responding with newly created static Ybus\n', flush=True)
             else:
                 fullUncomplex = self.Ybuses[feeder_mrid]
+                print('Responding with previously created static Ybus\n', flush=True)
 
             message = {
                 'feeder_id': feeder_mrid,
