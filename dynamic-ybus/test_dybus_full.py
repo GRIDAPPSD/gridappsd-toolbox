@@ -42,7 +42,7 @@ def _main():
 
   gapps = GridAPPSD()
 
-  # subscribe to all the Dynamic Ybus subscriptions
+  # subscribe to Dynamic Ybus full updates
   gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus-full',
                                                  simID), ybusFullCallback)
 
