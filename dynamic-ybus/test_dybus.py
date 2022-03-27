@@ -28,7 +28,6 @@ class DYbusTester:
     message = gapps.get_response(topic, request, timeout=90)
     print('Got dynamic Ybus snapshot response: ' + str(message) + '\n', flush=True)
 
-    snapshotTimestamp = message['timestamp']
     if self.timestampPreInit > message['timestamp']:
       print('Dynamic Ybus initialized from an update message with timestamp: ' + str(self.timestampPreInit) + ', snapshot timestamp: ' + str(message['timestamp']) + '\n', flush=True)
       self.Ybus = self.fullComplexInit(self.YbusPreInit)
