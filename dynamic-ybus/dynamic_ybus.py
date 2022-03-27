@@ -72,8 +72,7 @@ class SimWrapper(object):
     self.CapacitorMridToYbusContrib = CapacitorMridToYbusContrib
     self.CapacitorLastValue = CapacitorLastValue
     self.keepLoopingFlag = True
-    self.publish_to_topic_full = service_output_topic('gridappsd-dynamic-ybus-full', simulation_id)
-    self.publish_to_topic_changes = service_output_topic('gridappsd-dynamic-ybus-changes', simulation_id)
+    self.publish_to_topic = service_output_topic('gridappsd-dynamic-ybus', simulation_id)
     self.ybusInitFlag = False
 
 
@@ -139,31 +138,22 @@ class SimWrapper(object):
     #print('Full Ybus lower diagonal:', flush=True)
     #self.printLower(self.Ybus)
 
-    # JSON can't serialize complex values so convert to a tuple of real and imaginary values
-    # while also only populating lower diagonal elements
+    # JSON can't serialize complex values so convert to a tuple of real and
+    # imaginary values while also only populating lower diagonal elements
+    # for both ybus versions
+    lowerFull = self.lowerUncomplex(self.Ybus)
     lowerChanges = self.lowerUncomplex(YbusChanges)
     message = {
       'feeder_id': self.feeder_mrid,
       'simulation_id': self.simulation_id,
       'timestamp': self.timestamp,
-      'ybus': lowerChanges
+      'ybus': lowerFull,
+      'ybus_changes': lowerChanges
     }
-    self.gapps.send(self.publish_to_topic_changes, message)
-    print('\nYbusChanges published message:', flush=True)
+    self.gapps.send(self.publish_to_topic, message)
+    print('\nYbus published message:', flush=True)
     print(message, flush=True)
     print('')
-
-    lowerFull = self.lowerUncomplex(self.Ybus)
-    message = {
-      'feeder_id': self.feeder_mrid,
-      'simulation_id': self.simulation_id,
-      'timestamp': self.timestamp,
-      'ybus': lowerFull
-    }
-    self.gapps.send(self.publish_to_topic_full, message)
-    #print('\nYbus Full published message:', flush=True)
-    #print(message, flush=True)
-    #print('')
 
 
   def on_message(self, header, message):
@@ -182,13 +172,13 @@ class SimWrapper(object):
       print('Processing simulation timestamp: ' + str(self.timestamp), flush=True)
 
       # Questions:
-      # 1. HOLD Do we need to publish an index number based version of Ybus
+      # 1. Do we need to publish an index number based version of Ybus
       #    vs. just the node name based version? Ans:  Don't think so as index
       #    is just an artifact of the node list order and not meaningful.
       #    Shiva thinks I should publish an index based version so need to
       #    come back to this
 
-      # 2. HOLD Andy talked about creating a separate Ybus for each feeder and
+      # 2. Andy mentioned creating a separate Ybus for each feeder and
       #    island.  Right now I have only a monolithic Ybus so need to come
       #    back and get more guidance on this.  Perhaps this is related to
       #    making dynamic YBus aware of Topology Processor as I'm not sure
@@ -484,6 +474,7 @@ class DynamicYbus(GridAPPSD):
         'timestamp': self.simRap.timestamp,
         'ybus': lowerUncomplex
       }
+      print('Sending Ybus snapshot response for timestamp: ' + str(self.simRap.timestamp), flush=True)
       self.simRap.gapps.send(reply_to, message)
 
     else:
