@@ -14,6 +14,7 @@ class DYbusTester:
     self.YbusPreInit = {}
     self.timestampPreInit = 0
     self.ybusInitFlag = False
+    self.keepLoopingFlag = True
 
     # subscribe to Dynamic Ybus changes
     gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus', simID), self)
@@ -41,8 +42,16 @@ class DYbusTester:
     # do any processing after Ybus is initialized here
 
 
+  def keepLooping(self):
+    return self.keepLoopingFlag
+
+
   def on_message(self, header, message):
-    if not self.ybusInitFlag:
+    if 'processStatus' in message:
+      if message['processStatus']=='COMPLETE' or message['processStatus']=='CLOSED':
+        self.keepLoopingFlag = False
+
+    elif not self.ybusInitFlag:
       # save the most recent ybus message we get before request/response
       # initialization to compare timestamps with what comes back from that
       self.YbusPreInit = message['ybus']
@@ -50,8 +59,8 @@ class DYbusTester:
       print('Received pre-init Ybus update message with timestamp: ' + str(self.timestampPreInit) + '\n', flush=True)
 
     else:
-      print("Received Ybus update message with timestamp: ' + str(message['timestamp']) + ', Ybus changes: ' + str(message['ybus_changes']) + \n", flush=True)
-      self.fullComplexUpdate(message['ybus_changes'])
+      print("Received Ybus update message with timestamp: ' + str(message['timestamp']) + ', Ybus changes: ' + str(message['ybusChanges']) + \n", flush=True)
+      self.fullComplexUpdate(message['ybusChanges'])
 
       # do any processing after Ybus is updated here
 
@@ -90,8 +99,12 @@ def _main():
 
   dybus = DYbusTester(gapps, simID)
 
-  while True:
+  print('Starting dynamic Ybus monitoring loop...\n', flush=True)
+
+  while dybus.keepLooping():
     time.sleep(0.1)
+
+  print('Finished dynamic Ybus monitoring loop.\n', flush=True)
 
   gapps.disconnect()
 

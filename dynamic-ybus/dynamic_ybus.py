@@ -132,7 +132,7 @@ class SimWrapper(object):
     return YbusUncomplex
 
 
-  def publish(self, YbusChanges):
+  def publishYbus(self, YbusChanges):
     #print('\nYbusChanges lower diagonal:', flush=True)
     #self.printLower(YbusChanges)
     #print('Full Ybus lower diagonal:', flush=True)
@@ -148,10 +148,22 @@ class SimWrapper(object):
       'simulation_id': self.simulation_id,
       'timestamp': self.timestamp,
       'ybus': lowerFull,
-      'ybus_changes': lowerChanges
+      'ybusChanges': lowerChanges
     }
     self.gapps.send(self.publish_to_topic, message)
     print('\nYbus published message:', flush=True)
+    print(message, flush=True)
+    print('')
+
+
+  def publishStatus(self, status):
+    message = {
+      'feeder_id': self.feeder_mrid,
+      'simulation_id': self.simulation_id,
+      'processStatus': status
+    }
+    self.gapps.send(self.publish_to_topic, message)
+    print('\nStatus published message:', flush=True)
     print(message, flush=True)
     print('')
 
@@ -165,6 +177,7 @@ class SimWrapper(object):
       status = message['processStatus']
       if status=='COMPLETE' or status=='CLOSED':
         self.keepLoopingFlag = False
+        self.publishStatus(status)
 
     else:
       msgdict = message['message']
@@ -315,7 +328,7 @@ class SimWrapper(object):
           self.ybusInitFlag = True
         else:
           print('*** Ybus changed so I will publish full Ybus and YbusChanges!', flush=True)
-          self.publish(YbusChanges)
+          self.publishYbus(YbusChanges)
       else:
         print('Ybus NOT changed\n', flush=True)
 
@@ -544,13 +557,13 @@ class DynamicYbus(GridAPPSD):
     out_id = gapps_sim.subscribe(simulation_output_topic(simulation_id), self.simRap)
     log_id = gapps_sim.subscribe(simulation_log_topic(simulation_id), self.simRap)
 
-    print('Starting simulation monitoring loop....', flush=True)
+    print('Starting simulation monitoring loop...\n', flush=True)
 
     while self.simRap.keepLooping():
-      #print('Sleeping....', flush=True)
+      #print('Sleeping...', flush=True)
       time.sleep(0.1)
 
-    print('Finished simulation monitoring loop and Dynamic Ybus\n', flush=True)
+    print('Finished simulation monitoring loop and Dynamic Ybus.\n', flush=True)
 
     gapps.unsubscribe(req_id)
     gapps_sim.unsubscribe(out_id)
