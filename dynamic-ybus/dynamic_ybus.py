@@ -74,6 +74,7 @@ class SimWrapper(object):
     self.keepLoopingFlag = True
     self.publish_to_topic_full = service_output_topic('gridappsd-dynamic-ybus-full', simulation_id)
     self.publish_to_topic_changes = service_output_topic('gridappsd-dynamic-ybus-changes', simulation_id)
+    self.ybusInitFlag = False
 
 
   def keepLooping(self):
@@ -319,8 +320,12 @@ class SimWrapper(object):
             print('*** WARNING: Unknown exception processing capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
 
       if len(YbusChanges) > 0: # Ybus changed if there are any entries
-        print('*** Ybus changed so I will publish full Ybus and YbusChanges!', flush=True)
-        self.publish(YbusChanges)
+        if not self.ybusInitFlag:
+          print("*** First Ybus changes to initialize tap positions so don't publish, but allow snapshot responses!", flush=True)
+          self.ybusInitFlag = True
+        else:
+          print('*** Ybus changed so I will publish full Ybus and YbusChanges!', flush=True)
+          self.publish(YbusChanges)
       else:
         print('Ybus NOT changed\n', flush=True)
 
@@ -467,6 +472,11 @@ class DynamicYbus(GridAPPSD):
     reply_to = headers['reply-to']
 
     if message['requestType'] == 'GET_SNAPSHOT_YBUS':
+      # hold up responses until we know the ybus reflects the regulator
+      # tap positions for the simulation
+      while not self.simRap.ybusInitFlag:
+        time.sleep(0.1)
+
       lowerUncomplex = self.simRap.lowerUncomplex(self.simRap.Ybus)
       message = {
         'feeder_id': self.simRap.feeder_mrid,
@@ -531,15 +541,17 @@ class DynamicYbus(GridAPPSD):
     # Get node to index mapping from OpenDSS
     NodeIndex = self.opendss_ybus(sparql_mgr)
 
-    self.simRap = SimWrapper(gapps, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
+    gapps_sim = GridAPPSD()
+
+    self.simRap = SimWrapper(gapps_sim, feeder_mrid, simulation_id, Ybus, NodeIndex, SwitchMridToNodes, TransformerMridToNodes, TransformerLastPos, CapacitorMridToNode, CapacitorMridToYbusContrib, CapacitorLastValue)
 
     # don't subscribe to handle snapshot requests until we have an initial
     # Ybus to provide from the SimWrapper class
     topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simulation_id
     req_id = gapps.subscribe(topic, self)
 
-    out_id = gapps.subscribe(simulation_output_topic(simulation_id), self.simRap)
-    log_id = gapps.subscribe(simulation_log_topic(simulation_id), self.simRap)
+    out_id = gapps_sim.subscribe(simulation_output_topic(simulation_id), self.simRap)
+    log_id = gapps_sim.subscribe(simulation_log_topic(simulation_id), self.simRap)
 
     print('Starting simulation monitoring loop....', flush=True)
 
@@ -550,8 +562,8 @@ class DynamicYbus(GridAPPSD):
     print('Finished simulation monitoring loop and Dynamic Ybus\n', flush=True)
 
     gapps.unsubscribe(req_id)
-    gapps.unsubscribe(out_id)
-    gapps.unsubscribe(log_id)
+    gapps_sim.unsubscribe(out_id)
+    gapps_sim.unsubscribe(log_id)
 
     return
 
