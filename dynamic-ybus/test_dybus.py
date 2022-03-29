@@ -5,7 +5,7 @@ import time
 
 # gridappsd-python module
 from gridappsd import GridAPPSD
-from gridappsd.topics import service_output_topic
+from gridappsd.topics import service_output_topic, service_input_topic
 
 
 class DYbusTester:
@@ -20,11 +20,15 @@ class DYbusTester:
     gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus', simID), self)
 
     # request/response for snapshot Ybus
-    topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simID
     request = {
       "requestType": "GET_SNAPSHOT_YBUS"
     }
     print('Requesting dynamic Ybus snapshot for sim_id: ' + simID + '\n', flush=True)
+    # TODO figure out if there is a GridAPPS-D compliant topic to use
+    topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simID
+    #topic = service_input_topic('gridappsd-dynamic-ybus', simID)
+    #topic = '/topic/goss.gridappsd.simulation.gridappsd-dynamic-ybus.' + simID + '.input'
+    #topic = 'goss.gridappsd.simulation.gridappsd-dynamic-ybus.' + simID + '.input'
     message = gapps.get_response(topic, request, timeout=90)
     print('Got dynamic Ybus snapshot response: ' + str(message) + '\n', flush=True)
 
@@ -58,7 +62,7 @@ class DYbusTester:
       print('Received pre-init Ybus update message with timestamp: ' + str(self.timestampPreInit) + '\n', flush=True)
 
     else:
-      print("Received Ybus update message with timestamp: ' + str(message['timestamp']) + ', Ybus changes: ' + str(message['ybusChanges']) + \n", flush=True)
+      print('Received Ybus update message with timestamp: ' + str(message['timestamp']) + ', Ybus changes: ' + str(message['ybusChanges']) + '\n', flush=True)
       self.fullComplexUpdate(message['ybusChanges'])
 
       # do any processing after Ybus is updated here

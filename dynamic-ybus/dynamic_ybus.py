@@ -54,7 +54,7 @@ import pprint
 import numpy as np
 
 from gridappsd import GridAPPSD
-from gridappsd.topics import simulation_output_topic, simulation_log_topic, service_output_topic
+from gridappsd.topics import simulation_output_topic, simulation_log_topic, service_output_topic, service_input_topic
 
 
 class SimWrapper(object):
@@ -551,7 +551,11 @@ class DynamicYbus(GridAPPSD):
 
     # don't subscribe to handle snapshot requests until we have an initial
     # Ybus to provide from the SimWrapper class
+    # TODO figure out if there is a GridAPPS-D compliant topic to use
     topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simulation_id
+    #topic = service_input_topic('gridappsd-dynamic-ybus', simulation_id)
+    #topic = '/topic/goss.gridappsd.simulation.gridappsd-dynamic-ybus.' + simulation_id + '.input'
+    #topic = 'goss.gridappsd.simulation.gridappsd-dynamic-ybus.' + simulation_id + '.input'
     req_id = gapps.subscribe(topic, self)
 
     out_id = gapps_sim.subscribe(simulation_output_topic(simulation_id), self.simRap)
