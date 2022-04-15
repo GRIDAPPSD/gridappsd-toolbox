@@ -43,6 +43,7 @@ Created on July 15, 2021
 @author: Gary Black, Shiva Poudel, Rohit Jinsiwale
 """""
 
+#from platform import freedesktop_os_release
 import sys
 import time
 import os
@@ -57,30 +58,84 @@ from gridappsd import GridAPPSD
 from gridappsd import DifferenceBuilder
 from gridappsd.topics import simulation_input_topic
 from gridappsd.topics import simulation_output_topic
+from gridappsd.topics import service_output_topic, service_input_topic
 
-
-def greenCircle(colorFlag):
-    return '\u001b[32m\u25cf\u001b[37m' if colorFlag else '\u25cb'
-
-
-def redCircle(colorFlag):
-    return '\u001b[31m\u25cf\u001b[37m' if colorFlag else '\u25cf'
-
-
-def yellowCircle(colorFlag):
-    return '\u001b[33m\u25cf\u001b[37m' if colorFlag else '\u25d1'
-
-
+Ybusinit=False
+Ylast={}
+Simcomplete=True
 def pol2cart(rho, phi):
     return complex(rho*math.cos(phi), rho*math.sin(phi))
-
 
 def cart2pol(cart):
     rho = np.sqrt(np.real(cart)**2 + np.imag(cart)**2)
     phi = np.arctan2(np.imag(cart), np.real(cart))
     return (rho, phi)
 
+def tupletocomplex(Ydyn):
+    Ynew={}
+    for bus1 in list(Ydyn):
+        for bus2 in list(Ydyn[bus1]):
+            a=Ydyn[bus1][bus2][0]
+            b=Ydyn[bus1][bus2][1]
+            Ydyn[bus1][bus2]=complex(a,b)
+    return Ydyn
 
+def ybusFullCallback(header, message):
+  
+  global Ybusinit
+  global Ylast
+  if not Ybusinit:
+      Ybusinit=True
+      Ylast=tupletocomplex(message['ybus'])
+      # Do powerflow
+  else:
+      return
+
+  #Ydynamic=message['ybus']
+  #print('Received Ybus Full message: ' + str(message) + '\n', flush=True)
+  
+def ybusChangesCallback(header, message):
+  #print(message)
+  if 'processStatus' in message:
+      if message['processStatus']=='COMPLETE' or message['processStatus']=='CLOSED':
+        global Simcomplete
+        Simcomplete = False
+  else:
+        global Ybusinit
+        if Ybusinit:
+            Ychanges=tupletocomplex(message['ybusChanges'])
+            #print(Ychanges)
+            global log_file
+            global feeder_mrid
+            global simulation_id
+            global Ylast
+            for bus1 in Ychanges:
+                for bus2 in Ychanges[bus1]:
+                    global Ylast
+                    Ylast[bus1][bus2]=Ychanges[bus1][bus2]
+            print('Recieved Ybus update at time stamp'+ str(message['timestamp']))
+            print('Resolving power flow for updated system')
+            powerflow(log_file, feeder_mrid, simulation_id,Ylast)      
+'''
+def on_message(header, message):
+    if 'processStatus' in message:
+      if message['processStatus']=='COMPLETE' or message['processStatus']=='CLOSED':
+        global Simcomplete
+        Simcomplete = False
+    else:
+      global Ybusinit
+      if Ybusinit:
+          Ychanges=tupletocomplex(message['ybusChanges'])
+          global log_file
+          global feeder_mrid
+          global simulation_id
+          global Ylast
+          for bus1 in Ychanges:
+            for bus2 in Ychanges[bus1]:
+                global Ylast
+                Ylast[bus1][bus2]=Ylast[bus1][bus2]+Ychanges[bus1][bus2]
+          powerflow(log_file, feeder_mrid, simulation_id,Ylast)      
+'''
 class SimSetWrapper(object):
     def __init__(self, gapps, simulation_id, Rids):
         self.gapps = gapps
@@ -139,14 +194,18 @@ class SimCheckWrapper(object):
 
         msgdict = message['message']
         ts = msgdict['timestamp']
-        print('simulation timestamp: ' + str(ts), flush=True)
+        #print('simulation timestamp: ' + str(ts), flush=True)
         #print(msgdict['measurements'])
         measurements = msgdict['measurements']
+        #print('Measurments are: ')
+        #print(measurements)
+        #print('Measurments end')
         #for mrid in measurements:
         #    print('simulation mrid: ' + mrid)
         #    print('simulation data: ' + str(measurements[mrid]))
         # check RegMRIDs for 0 tap positions
         allZeroFlag = True
+        '''
         for mrid in self.RegMRIDs:
             meas = measurements[mrid]
             print(meas, flush=True)
@@ -154,7 +213,7 @@ class SimCheckWrapper(object):
                 allZeroFlag = False
                 # TODO uncomment the following line to not check all mRIDs
                 break
-
+        '''
         if allZeroFlag:
             for mrid, condType, idx1, idx2 in self.CondMRIDs:
                 #if idx==27 or idx==29 or idx==33 or idx==34:
@@ -162,6 +221,7 @@ class SimCheckWrapper(object):
                 #if self.Sinj[idx] != 0j:
                 #    print('This is the second contributor to Sinj for idx: ' + str(idx) + ', condType: ' + condType, flush=True)
                 meas = measurements[mrid]
+                #print(meas)
                 if condType == 'EnergyConsumer':
                     if idx2 == None:
                         self.Sinj[idx1] += -1.0*pol2cart(meas['magnitude'], math.radians(meas['angle']))
@@ -189,170 +249,16 @@ class SimCheckWrapper(object):
 
             self.keepLoopingFlag = False
 
-def nodes_to_update(sparql_mgr):
-    print('\nFinding dynamic Ybus nodes to track for simulation updates...', flush=True)
-
-    phaseToIdx = {'A': '.1', 'B': '.2', 'C': '.3', 's1': '.1', 's2': '.2'}
-
-    bindings = sparql_mgr.SwitchingEquipment_switch_names()
-    switchToBuses = {}
-    for obj in bindings:
-      sw_name = obj['sw_name']['value']
-      bus1 = obj['bus1']['value'].upper()
-      bus2 = obj['bus2']['value'].upper()
-      switchToBuses[sw_name] = [bus1, bus2]
-
-    bindings = sparql_mgr.TransformerTank_xfmr_names()
-    xfmrtoBuses = {}
-    Buses = {}
-    Phases = {}
-    baseV = {}
-    for obj in bindings:
-      xfmr_name = obj['xfmr_name']['value']
-      enum = int(obj['enum']['value'])
-      if xfmr_name not in Buses:
-        Buses[xfmr_name] = {}
-        Phases[xfmr_name] = {}
-        baseV[xfmr_name] = {}
-      Buses[xfmr_name][enum] = obj['bus']['value'].upper()
-      Phases[xfmr_name] = obj['phase']['value']
-      baseV[xfmr_name][enum] = obj['baseV']['value']
-
-    Nodes = {}
-    for bus in Buses:
-      # For regulator, the terminal base voltage should be equal
-      if baseV[bus][1] == baseV[bus][2]:
-        node1 = Buses[bus][1] + phaseToIdx[Phases[bus]]
-        node2 = Buses[bus][2] + phaseToIdx[Phases[bus]]
-        Nodes[node1] = Nodes[node2] = {}
-        Nodes[node1]['conn'] = node2
-        Nodes[node2]['conn'] = node1
-
-    # Get the per capacitor Ybus contributions
-    bindings = sparql_mgr.ShuntElement_cap_names()
-    CapToYbusContrib = {}
-    for obj in bindings:
-      cap_name = obj['cap_name']['value']
-      b_per_section = float(obj['b_per_section']['value'])
-      CapToYbusContrib[cap_name] = complex(0.0, b_per_section)
-      #print('cap_name: ' + cap_name + ', b_per_section: ' + str(b_per_section))
-
-    feeders = sparql_mgr.cim_export()
-
-    SwitchMridToNodes = {}
-    TransformerMridToNodes = {}
-    TransformerLastPos = {}
-    CapacitorMridToNode = {}
-    CapacitorLastValue = {}
-    CapacitorMridToYbusContrib = {}
-
-    for feeder in feeders:
-      for meas in feeder['measurements']:
-        # Pos measurement type includes both switches and regulators
-        if meas['measurementType'] == 'Pos':
-          mrid = meas['mRID']
-          phase = meas['phases']
-          if meas['ConductingEquipment_type'] == 'LoadBreakSwitch':
-            sw_name = meas['ConductingEquipment_name']
-            if sw_name in switchToBuses:
-              buses = switchToBuses[sw_name]
-              node1 = buses[0] + phaseToIdx[phase]
-              node2 = buses[1] + phaseToIdx[phase]
-              SwitchMridToNodes[mrid] = [node1, node2]
-              print('Switch mrid: ' + mrid + ', nodes: ' + str(SwitchMridToNodes[mrid]), flush=True)
-          elif meas['ConductingEquipment_type'] == 'PowerTransformer':
-            node =  meas['ConnectivityNode'] + phaseToIdx[phase]
-            node2 = node.upper()
-            node1 = Nodes[node2]['conn']
-            TransformerMridToNodes[mrid] = [node1, node2]
-            TransformerLastPos[node2] = 0
-            print('Transformer mrid: ' + mrid + ', nodes: ' + str(TransformerMridToNodes[mrid]), flush=True)
-          elif meas['ConductingEquipment_type'] == 'LinearShuntCompensator':
-            node = meas['ConnectivityNode'] + phaseToIdx[phase]
-            node = node.upper()
-            CapacitorMridToNode[mrid] = node
-            CapacitorLastValue[node] = 1
-            print('Capacitor mrid: ' + mrid + ', node: ' + node, flush=True)
-            cap_name = meas['ConductingEquipment_name']
-            if cap_name in CapToYbusContrib:
-              CapacitorMridToYbusContrib[mrid] = CapToYbusContrib[cap_name]
-              #print('Capacitor mrid: ' + mrid + ', node: ' + node + ', Ybus contribution: ' + str(CapToYbusContrib[cap_name]), flush=True)
-            else:
-              #print('Capacitor mrid: ' + mrid + ', node: ' + node, flush=True)
-              print('*** WARNING: CIM dictionary capacitor name not found from b_per_section query: ' + cap_name, flush=True)
-            #print(meas)
-
-    #print('Switches:', flush=True)
-    #pprint.pprint(SwitchMridToNodes)
-    #print('Transformers:', flush=True)
-    #pprint.pprint(TransformerMridToNode)
-    #print('Capacitors:', flush=True)
-    #pprint.pprint(CapacitorMridToNode)
-    #pprint.pprint(CapacitorMridToYbusContrib)
-
-    # Hold here for demo
-    #text = input('\nWait here...')
-
-    return SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue
-
-
-def start(log_file, feeder_mrid, model_api_topic, simulation_id):
+def powerflow(log_file, feeder_mrid, simulation_id,Ysys):
     global logfile
     logfile = log_file
 
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
 
     gapps = GridAPPSD()
-
-    #sparql_mgr = SPARQLManager(gapps, feeder_mrid, model_api_topic,simulation_id)
+    
     sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
-
-    #SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
-    Ysys={}
-  # Get starting Ybus from static_ybus module
     
-    ### Option 1
-    #'''
-    
-    mod_import = importlib.import_module('static-ybus.static_ybus')
-    static_ybus_func = getattr(mod_import, 'static_ybus')
-    Ysys = static_ybus_func(feeder_mrid)
-    #print(Ysys)
-    #print(Ysys[1])
-    #'''
-    ### Option 2 
-    '''
-    Unsupported = {}
-
-    mod_import = importlib.import_module('line_model_validator.line_model_validator')
-    start_func = getattr(mod_import, 'start')
-    start_func(log_file, feeder_mrid, model_api_topic, False, Ysys, Unsupported)
-    #print('line_model_validator Ysys...')
-    #print(Ysys)
-    #line_count = 0
-    #for bus1 in Ysys:
-    #    line_count += len(Ysys[bus1])
-    #print('\nLine_model # entries: ' + str(line_count) + '\n', flush=True)
-    #print('\nLine_model # entries: ' + str(line_count) + '\n', file=logfile)
-
-    mod_import = importlib.import_module('power_transformer_validator.power_transformer_validator')
-    start_func = getattr(mod_import, 'start')
-    start_func(log_file, feeder_mrid, model_api_topic, False, Ysys, Unsupported)
-    #print('power_transformer_validator Ysys...')
-    #print(Ysys)
-    #count = 0
-    #for bus1 in Ysys:
-    #    count += len(Ysys[bus1])
-    #xfmr_count = count - line_count
-    #print('Power_transformer # entries: ' + str(xfmr_count) + '\n', flush=True)
-    #print('Power_transformer # entries: ' + str(xfmr_count) + '\n', file=logfile)
-
-    mod_import = importlib.import_module('switching_equipment_validator.switching_equipment_validator')
-    start_func = getattr(mod_import, 'start')
-    start_func(log_file, feeder_mrid, model_api_topic, False, Ysys, Unsupported)
-
-    print(Ysys)
-    '''
     ysysCount = 0
     for bus1 in Ysys:
         ysysCount += len(Ysys[bus1])
@@ -373,13 +279,9 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
     sourcebus, sourcevang = sparql_mgr.sourcebus_query()
     sourcebus = sourcebus.upper()
-    #print('\nquery results sourcebus: ' + sourcebus)
-    #print('query results sourcevang: ' + str(sourcevang))
-
+    
     bindings = sparql_mgr.nomv_query()
-    #print('\nnomv query results:')
-    #print(bindings)
-
+    
     sqrt3 = math.sqrt(3.0)
     Vmag = {}
 
@@ -455,23 +357,7 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
     # time to get the source injection terms
     # first, get the dictionary of regulator ids
-    bindings = sparql_mgr.regid_query()
-    Rids = []
-    for obj in bindings:
-        Rids.append(obj['rid']['value'])
-    print('\nRegulator IDs: ' + str(Rids))
-
-    # second, subscribe to simulation output so we can start setting tap
-    # positions to 0
-    simSetRap = SimSetWrapper(gapps, simulation_id, Rids)
-    conn_id = gapps.subscribe(simulation_output_topic(simulation_id), simSetRap)
-
-    while simSetRap.keepLooping():
-        #print('Sleeping....', flush=True)
-        time.sleep(0.1)
-
-    gapps.unsubscribe(conn_id)
-
+    
     bindings = sparql_mgr.query_energyconsumer_lf()
     #print(bindings)
 
@@ -484,7 +370,7 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
         conn = obj['conn']['value']
         phases = obj['phases']['value']
         #print('bus: ' + bus + ', conn: ' + conn + ', phases: ' + phases)
-        if conn == 'D':
+        if conn == 'A':
            if phases == '':
                DeltaList.append(bus+'.1')
                DeltaList.append(bus+'.2')
@@ -513,10 +399,10 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
     for feeder in cim_dict['data']['feeders']:
         for measurement in feeder['measurements']:
-            if measurement['name'].startswith('RatioTapChanger') and measurement['measurementType']=='Pos':
-                RegMRIDs.append(measurement['mRID'])
+            #if measurement['name'].startswith('RatioTapChanger') and measurement['measurementType']=='Pos':
+            #    RegMRIDs.append(measurement['mRID'])
 
-            elif measurement['measurementType']=='VA' and (measurement['ConductingEquipment_type'] in condTypes):
+            if measurement['measurementType']=='VA' and (measurement['ConductingEquipment_type'] in condTypes):
                 node = measurement['ConnectivityNode'].upper() + phaseIdx[measurement['phases']]
                 if node in DeltaList:
                     node2 = measurement['ConnectivityNode'].upper() + phaseIdx2[measurement['phases']]
@@ -551,13 +437,13 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
     # and then setting Sinj
     simCheckRap = SimCheckWrapper(Sinj, PNVmag, RegMRIDs, CondMRIDs, PNVmRIDs, PNVdict)
     conn_id = gapps.subscribe(simulation_output_topic(simulation_id), simCheckRap)
-
+    
     while simCheckRap.keepLooping():
         #print('Sleeping....', flush=True)
         time.sleep(0.1)
 
     gapps.unsubscribe(conn_id)
-
+    #gapps.disconnect()
     print('\nFinal Sinj:')
     #print(Sinj)
     for key,value in Node2idx.items():
@@ -586,7 +472,7 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
     tolerance = 0.01
     Nfpi = 10
-    Nfpi = 15
+    Nfpi = 25
     Isrc_vec = np.zeros((N), dtype=complex)
     Vfpi = np.zeros((N,Nfpi), dtype=complex)
 
@@ -618,12 +504,12 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
         #print(Vfpi[:,k])
 
         maxlist = abs(abs(Vfpi[:,k]) - abs(Vfpi[:,k-1]))
-        print("\nmaxlist:")
-        for i in range(41):
-          print(str(i) + ": " + str(maxlist[i]))
+        #print("\nmaxlist:")
+        #for i in range(41):
+          #print(str(i) + ": " + str(maxlist[i]))
 
         maxdiff = max(abs(abs(Vfpi[:,k]) - abs(Vfpi[:,k-1])))
-        print("\nk: " + str(k) + ", maxdiff: " + str(maxdiff))
+        #print("\nk: " + str(k) + ", maxdiff: " + str(maxdiff))
         k += 1
 
     if k == Nfpi:
@@ -632,26 +518,35 @@ def start(log_file, feeder_mrid, model_api_topic, simulation_id):
 
     # set the final Vpfi index
     k -= 1
-    print("\nconverged k: " + str(k))
-    print("\nVfpi:")
+    print("\nconverged k: " + str(k),flush=True)
+    print("\nVfpi:",flush=True)
     for key, value in Node2idx.items():
         rho, phi = cart2pol(Vfpi[value,k])
-        print(key + ': rho: ' + str(rho) + ', phi: ' + str(math.degrees(phi)))
-        print('index: ' + str(value) + ', sim mag: ' + str(PNVmag[value]))
+        print(key + ': rho: ' + str(rho) + ', phi: ' + str(math.degrees(phi)),flush=True)
+        print('index: ' + str(value) + ', sim mag: ' + str(PNVmag[value]),flush=True)
 
     print("\nVfpi rho to sim magnitude CSV:")
     for key, value in Node2idx.items():
         mag = PNVmag[value]
         if mag != 0.0:
             rho, phi = cart2pol(Vfpi[value,k])
-            print(str(value) + ',' + key + ',' + str(rho) + ',' + str(mag))
-
+            #print(str(value) + ',' + key + ',' + str(rho) + ',' + str(mag),flush=True)
+            print(str(value) + ',' + key + ',' + str(rho),flush=True)
+    print('\n \n')
+    gapps.disconnect()
     return
 
 
 
 def _main():
     # for loading modules
+    global log_file
+    global feeder_mrid
+    global simulation_id
+    global Ylast
+    global Ybusinit
+    global Simcomplete
+    
     if (os.path.isdir('shared')):
         sys.path.append('.')
     elif (os.path.isdir('../shared')):
@@ -665,11 +560,29 @@ def _main():
     sim_request = json.loads(opts.request.replace("\'",""))
     feeder_mrid = sim_request["power_system_config"]["Line_name"]
     simulation_id = opts.simid
-
+    
     model_api_topic = "goss.gridappsd.process.request.data.powergridmodel"
     log_file = open('ysystem_validator.log', 'w')
 
-    start(log_file, feeder_mrid, model_api_topic, simulation_id)
+    gapps=GridAPPSD()
+    gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus', simulation_id),ybusChangesCallback)
+    request = {
+      "requestType": "GET_SNAPSHOT_YBUS"
+    }
+    topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simulation_id
+    message = gapps.get_response(topic, request, timeout=90)
+    Ylast=tupletocomplex(message['ybus'])
+    #print(Ylast)
+    Ybusinit=True
+    print('Ybus has been initialized\n')
+    #print(Ylast)
+    powerflow(log_file, feeder_mrid, simulation_id,Ylast)
+
+    while Simcomplete:
+        time.sleep(0.1)
+
+    gapps.disconnect()
+    
 
 
 if __name__ == "__main__":
