@@ -66,7 +66,8 @@ fi
 # invoke shunt_element_validator with "./run-validator 9500"
 #python3 shunt_element_validator/shunt_element_validator.py --request "$SIMREQ" --simid $SIMID 2>&1 | tee validator.log
 # invoke load_flow_validator with "./run-validator 9500 nosim"
-python3 power_flow.py --request "$SIMREQ" --simid $SIMID 2>&1 | tee validator.log
+python3 ../dynamic-ybus/dynamic_ybus.py --request "$SIMREQ" --simid $SIMID >/dev/null 2>&1 | tee dybus.log &
+python3 power_flow.py --request "$SIMREQ" --simid $SIMID 2>&1 | tee powerflow.log
 # End of Ybus based validation
 
 if [[ ! -z "$SIMID" ]]; then
