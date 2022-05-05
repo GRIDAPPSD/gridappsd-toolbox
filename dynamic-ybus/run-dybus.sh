@@ -22,5 +22,5 @@ else
     SIMID=$1
 fi
 
-python3 dynamic_ybus.py --request "$SIMREQ" --simid $SIMID 2>&1 | tee dybus.log
+python3 dynamic_ybus.py $SIMID "$SIMREQ" 2>&1 | tee dybus.log
 

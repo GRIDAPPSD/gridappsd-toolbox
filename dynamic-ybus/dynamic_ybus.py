@@ -509,12 +509,7 @@ class DynamicYbus(GridAPPSD):
     return YbusComplex
 
 
-  def __init__(self, log_file, feeder_mrid, simulation_id):
-    global logfile
-    logfile = log_file
-
-    gapps = GridAPPSD()
-
+  def __init__(self, gapps, feeder_mrid, simulation_id):
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
     sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
@@ -584,20 +579,24 @@ def _main():
     sys.path.append('..')
    
   parser = argparse.ArgumentParser()
-  parser.add_argument("--request", help="Simulation Request")
-  parser.add_argument("--simid", help="Simulation ID")
+  parser.add_argument("simulation_id", help="Simulation ID")
+  parser.add_argument("request", help="Simulation Request")
 
   opts = parser.parse_args()
   sim_request = json.loads(opts.request.replace("\'",""))
   feeder_mrid = sim_request["power_system_config"]["Line_name"]
-  simulation_id = opts.simid
+  simulation_id = opts.simulation_id
 
-  #simulation_id = "1423134294"
-  #feeder_mrid = "_5B816B93-7A5F-B64C-8460-47C17D6E4B0F"
+  # authenticate with GridAPPS-D Platform
+  os.environ['GRIDAPPSD_APPLICATION_ID'] = 'gridappsd-dynamic-ybus-service'
+  os.environ['GRIDAPPSD_APPLICATION_STATUS'] = 'STARTED'
+  os.environ['GRIDAPPSD_USER'] = 'system'
+  os.environ['GRIDAPPSD_PASSWORD'] = 'manager'
 
-  log_file = open('dynamic_ybus.log', 'w')
+  gapps = GridAPPSD(simulation_id)
+  assert gapps.connected
 
-  dynamic_ybus = DynamicYbus(log_file, feeder_mrid, simulation_id)
+  dynamic_ybus = DynamicYbus(gapps, feeder_mrid, simulation_id)
 
 
 if __name__ == "__main__":

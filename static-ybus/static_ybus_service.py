@@ -58,10 +58,10 @@ from gridappsd import GridAPPSD
 
 class StaticYbus(GridAPPSD):
 
-    def __init__(self):
+    def __init__(self, gapps):
         self.Ybuses = {}
 
-        self.gapps = GridAPPSD()
+        self.gapps = gapps
 
         # UGH!!!  Need to create a second GridAPPSD instance in order to
         # avoid deadlock if trying to use the existing one for the queries
@@ -148,7 +148,13 @@ def _main():
     elif (os.path.isdir('../shared')):
         sys.path.append('..')
 
-    static_ybus = StaticYbus()
+    os.environ['GRIDAPPSD_USER'] = 'app_user'
+    os.environ['GRIDAPPSD_PASSWORD'] = '1234App'
+
+    gapps = GridAPPSD()
+    assert gapps.connected
+
+    static_ybus = StaticYbus(gapps)
 
 
 if __name__ == "__main__":
