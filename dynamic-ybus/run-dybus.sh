@@ -11,7 +11,7 @@
 if [[ -z "$SIMREQ" ]]; then
     # requires at least a reference to the type of simulation to use
     if [ "$#" -eq 0 ]; then
-        echo "Usage: ./run-dy.sh #nodes"
+        echo "Usage: ./run-dybus.sh #nodes"
         echo
         exit
     fi
