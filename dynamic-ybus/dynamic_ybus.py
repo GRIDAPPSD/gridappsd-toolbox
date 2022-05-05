@@ -509,15 +509,20 @@ class DynamicYbus(GridAPPSD):
     return YbusComplex
 
 
-  def __init__(self, gapps, feeder_mrid, simulation_id):
+  def __init__(self, gapps, feeder_mrid, simulation_id, apiFlag):
     SPARQLManager = getattr(importlib.import_module('shared.sparql'), 'SPARQLManager')
     sparql_mgr = SPARQLManager(gapps, feeder_mrid, simulation_id)
 
     SwitchMridToNodes,TransformerMridToNodes,TransformerLastPos,CapacitorMridToNode,CapacitorMridToYbusContrib,CapacitorLastValue = nodes_to_update(sparql_mgr)
 
-    # Get starting Ybus from static_ybus module
-    serviceFlag = False
-    if serviceFlag:
+    # Get starting Ybus from static_ybus either from an API call or
+    # a service request
+    if apiFlag:
+      mod_import = importlib.import_module('static-ybus.static_ybus')
+      static_ybus_func = getattr(mod_import, 'static_ybus')
+      Ybus = static_ybus_func(gapps, feeder_mrid)
+
+    else:
       # request/response for snapshot Ybus
       topic = 'goss.gridappsd.request.data.static-ybus'
       request = {
@@ -528,11 +533,6 @@ class DynamicYbus(GridAPPSD):
       message = gapps.get_response(topic, request, timeout=90)
       print('Got Ybus snapshot response: ' + str(message) + '\n', flush=True)
       Ybus = self.fullComplex(message['ybus'])
-
-    else:
-      mod_import = importlib.import_module('static-ybus.static_ybus')
-      static_ybus_func = getattr(mod_import, 'static_ybus')
-      Ybus = static_ybus_func(gapps, feeder_mrid)
 
     # Hold here for demo
     #text = input('\nWait here...')
@@ -581,11 +581,13 @@ def _main():
   parser = argparse.ArgumentParser()
   parser.add_argument("simulation_id", help="Simulation ID")
   parser.add_argument("request", help="Simulation Request")
-
+  parser.add_argument("--api", action="store_true", help="Invoke static ybus as an API call rather than as a service")
   opts = parser.parse_args()
+
   sim_request = json.loads(opts.request.replace("\'",""))
   feeder_mrid = sim_request["power_system_config"]["Line_name"]
   simulation_id = opts.simulation_id
+  apiFlag = opts.api
 
   # authenticate with GridAPPS-D Platform
   os.environ['GRIDAPPSD_APPLICATION_ID'] = 'gridappsd-dynamic-ybus-service'
@@ -596,7 +598,7 @@ def _main():
   gapps = GridAPPSD(simulation_id)
   assert gapps.connected
 
-  dynamic_ybus = DynamicYbus(gapps, feeder_mrid, simulation_id)
+  dynamic_ybus = DynamicYbus(gapps, feeder_mrid, simulation_id, apiFlag)
 
 
 if __name__ == "__main__":
