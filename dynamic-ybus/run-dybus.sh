@@ -22,5 +22,8 @@ else
     SIMID=$1
 fi
 
-python3 dynamic_ybus.py $SIMID "$SIMREQ" 2>&1 | tee dybus.log
+# this version invokes static ybus as an API call
+python3 dynamic_ybus.py $SIMID "$SIMREQ" --api 2>&1 | tee dybus.log
+# this version invokes static ybus as a service
+#python3 dynamic_ybus.py $SIMID "$SIMREQ" 2>&1 | tee dybus.log
 
