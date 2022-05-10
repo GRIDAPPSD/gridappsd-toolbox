@@ -34,5 +34,8 @@
        "appId":""
 
 },
-   "service_configs":[]
+   "service_configs":[
+       {"id":"gridappsd-dynamic-ybus-service"}
+        ]
 }
+
