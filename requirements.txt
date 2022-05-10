@@ -1,0 +1,3 @@
+# required python packages for GridAPPS-D platform integration
+numpy>=1.19.1
+pandas>=1.1.1
