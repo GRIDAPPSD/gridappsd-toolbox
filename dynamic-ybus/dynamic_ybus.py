@@ -596,8 +596,8 @@ def _main():
   # authenticate with GridAPPS-D Platform
   os.environ['GRIDAPPSD_APPLICATION_ID'] = 'gridappsd-dynamic-ybus-service'
   os.environ['GRIDAPPSD_APPLICATION_STATUS'] = 'STARTED'
-  os.environ['GRIDAPPSD_USER'] = 'system'
-  os.environ['GRIDAPPSD_PASSWORD'] = 'manager'
+  os.environ['GRIDAPPSD_USER'] = 'app_user'
+  os.environ['GRIDAPPSD_PASSWORD'] = '1234App'
 
   gapps = GridAPPSD(simulation_id)
   assert gapps.connected
