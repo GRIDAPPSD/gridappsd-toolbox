@@ -50,8 +50,6 @@ import time
 import argparse
 import json
 import importlib
-import math
-import numpy as np
 
 from gridappsd import GridAPPSD
 
@@ -147,6 +145,10 @@ def _main():
         sys.path.append('.')
     elif (os.path.isdir('../shared')):
         sys.path.append('..')
+    elif (os.path.isdir('gridappsd-toolbox/shared')):
+        sys.path.append('gridappsd-toolbox')
+    else:
+        sys.path.append('/gridappsd/services/gridappsd-toolbox')
 
     os.environ['GRIDAPPSD_APPLICATION_ID'] = 'gridappsd-static-ybus-service'
     os.environ['GRIDAPPSD_APPLICATION_STATUS'] = 'STARTED'
