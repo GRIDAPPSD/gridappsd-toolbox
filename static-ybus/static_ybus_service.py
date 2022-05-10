@@ -148,6 +148,8 @@ def _main():
     elif (os.path.isdir('../shared')):
         sys.path.append('..')
 
+    os.environ['GRIDAPPSD_APPLICATION_ID'] = 'gridappsd-static-ybus-service'
+    os.environ['GRIDAPPSD_APPLICATION_STATUS'] = 'STARTED'
     os.environ['GRIDAPPSD_USER'] = 'app_user'
     os.environ['GRIDAPPSD_PASSWORD'] = '1234App'
 
