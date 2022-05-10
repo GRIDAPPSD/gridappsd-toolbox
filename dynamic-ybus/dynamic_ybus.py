@@ -577,6 +577,10 @@ def _main():
     sys.path.append('.')
   elif (os.path.isdir('../shared')):
     sys.path.append('..')
+  elif (os.path.isdir('gridappsd-toolbox/shared')):
+    sys.path.append('gridappsd-toolbox')
+  else:
+    sys.path.append('/gridappsd/services/gridappsd-toolbox')
    
   parser = argparse.ArgumentParser()
   parser.add_argument("simulation_id", help="Simulation ID")
