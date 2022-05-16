@@ -10,14 +10,16 @@ App Toolbox capabilities currently in development:
 
 * __Topology Processor__ -- Process network topology updates in real time, keep track of what DERs are connected to which substation
 
-* __Dynamic Y-Bus Matrix__ -- Provides a real-time Y-bus when queried, updates Y-bus with current switch and tap positions 
+* __Static Y-Bus Matrix__ -- Provides an as-built Y-bus for a given model
 
+* __Dynamic Y-Bus Matrix__ -- Provides a real-time Y-bus when queried, updates Y-bus with current switch and tap positions
+
+* __Snapshot Power Flow Service__ -- Send substation voltage and load values, receive snapshot power flow for current state of the network
 
 App Toolbox capability currently under consideration:
 
 * __Measurement mRID Manager__ -- Configure sensors by removing specific measurement mRIDs from simulation output (different from dropping measurements via sensor service)
 
-* __Snapshot Power Flow Service__ -- Send substation voltage and load values, receive snapshot power flow for current state of the network
 
 * __Snapshot State Estimation Service__ -- Generate a single state estimation run for the current state of the network
 
