@@ -1,6 +1,6 @@
 # GridAPPS-D Toolbox Static Y-bus
 
-Static Y-bus is a lightweight service that returns Y-bus admittance matrices created from corresponding network equipment models to requesting applications. The term "static" refers to the matrix only being tied to the model and not to a simulation using the model. If an application is associated with a running simulation, the Dynamic Y-bus service should normally be used instead, unless there is some specialized need to only receive a Y-bus that does not reflect any of the ongoing changes such as to switch states and regulator tap positions from the simlation.
+Static Y-bus is a lightweight service that provides Y-bus complex system admittance matrices represented in a Python dictionary of dimension 2, also referred to as a dictionary of a dictionary. Y-bus matrices are constructed from the underlying network equipment model using a method originally developed for the GridAPPS-D Model Validator application. Applications processing as-built models (e.g., outside of a field or simulation context) should use the Static Y-bus service, while applications within an as-operated (e.g., field or simulation) context should use the related Dynamic Y-bus service. The Static Y-bus service supports request/response queries for returning Y-bus matrices.
 
 ## Static Y-bus Overview
 
