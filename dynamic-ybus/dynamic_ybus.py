@@ -184,18 +184,11 @@ class SimWrapper(object):
       self.timestamp = msgdict['timestamp']
       print('Processing simulation timestamp: ' + str(self.timestamp), flush=True)
 
-      # Questions:
-      # 1. Do we need to publish an index number based version of Ybus
-      #    vs. just the node name based version? Ans:  Don't think so as index
-      #    is just an artifact of the node list order and not meaningful.
-      #    Shiva thinks I should publish an index based version so need to
-      #    come back to this
-
-      # 2. Andy mentioned creating a separate Ybus for each feeder and
-      #    island.  Right now I have only a monolithic Ybus so need to come
-      #    back and get more guidance on this.  Perhaps this is related to
-      #    making dynamic YBus aware of Topology Processor as I'm not sure
-      #    of the need for this otherwise
+      # Question: Andy mentioned creating a separate Ybus for each feeder and
+      #   island.  Right now I have only a monolithic Ybus so need to come
+      #   back and get more guidance on this.  Perhaps this is related to
+      #   making dynamic YBus aware of Topology Processor as I'm not sure
+      #   of the need for this otherwise
 
       switchOpenValue = complex(0,0)
       switchClosedValue = complex(-500,500)
