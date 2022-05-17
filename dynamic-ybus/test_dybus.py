@@ -5,11 +5,11 @@ import time
 
 # gridappsd-python module
 from gridappsd import GridAPPSD
-from gridappsd.topics import service_output_topic, service_input_topic
+from gridappsd.topics import service_output_topic
 
 
 class DYbusTester:
-  def __init__(self, gapps, simID):
+  def __init__(self, gapps, simulation_id):
     self.Ybus = {}
     self.YbusPreInit = {}
     self.timestampPreInit = 0
@@ -17,14 +17,14 @@ class DYbusTester:
     self.keepLoopingFlag = True
 
     # subscribe to Dynamic Ybus changes
-    gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus', simID), self)
+    gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus', simulation_id), self)
 
     # request/response for snapshot Ybus
-    topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simID
+    topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simulation_id
     request = {
       "requestType": "GET_SNAPSHOT_YBUS"
     }
-    print('Requesting Dynamic Ybus snapshot for sim_id: ' + simID + '\n', flush=True)
+    print('Requesting Dynamic Ybus snapshot for sim_id: ' + simulation_id + '\n', flush=True)
     message = gapps.get_response(topic, request, timeout=90)
     print('Got Dynamic Ybus snapshot response: ' + str(message) + '\n', flush=True)
 
@@ -88,15 +88,15 @@ class DYbusTester:
 
 def _main():
   if len(sys.argv) < 2:
-    usestr =  '\nUsage: ' + sys.argv[0] + ' simID\n' 
+    usestr =  '\nUsage: ' + sys.argv[0] + ' simulation_id\n'
     print(usestr, flush=True)
     exit()
 
-  simID = sys.argv[1]
+  simulation_id = sys.argv[1]
 
   gapps = GridAPPSD()
 
-  dybus = DYbusTester(gapps, simID)
+  dybus = DYbusTester(gapps, simulation_id)
 
   print('Starting Dynamic Ybus monitoring loop...\n', flush=True)
 
