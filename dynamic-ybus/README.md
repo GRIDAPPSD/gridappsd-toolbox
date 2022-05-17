@@ -66,7 +66,7 @@ Note the update message contains both ybus and ybusChanges elements.  Normally a
 
 ## Service Output Response and Published Update Processing
 
-After making the request via the get_response call and still within the \__init__ function for the class, the following code insures the starting Y-bus is the most recent available:
+After making the request via the get_response call and still within the \_\_init__ function for the class, the following code insures the starting Y-bus is the most recent available:
 
 ```
     if self.timestampPreInit > message['timestamp']:
@@ -97,7 +97,7 @@ The fullComplexInit function is simply a utility function that converts the lowe
     return YbusInit
 ```
 
-The on_message function of the class receives the published Dynamic Y-bus updates. The three class variables with Init in the names that are initialized in the \__init__ function are used in on_message to be able to determine if the Y-bus returned by the get_response call is indeed the most recent. Dynamic Y-bus, as a help to applications, also publishes as "processStatus" message that denotes when the underlying simulation has finished and there will be no further Dynamic Y-bus messages for that simulation. The keepLooping function can be invoked outside the class to exit processing. The on_message fnd keepLooping functions are:
+The on_message function of the class receives the published Dynamic Y-bus updates. The three class variables with Init in the names that are initialized in the \_\_init__ function are used in on_message to be able to determine if the Y-bus returned by the get_response call is indeed the most recent. Dynamic Y-bus, as a help to applications, also publishes as "processStatus" message that denotes when the underlying simulation has finished and there will be no further Dynamic Y-bus messages for that simulation. The keepLooping function can be invoked outside the class to exit processing. The on_message fnd keepLooping functions are:
 
 ```
   def on_message(self, header, message):
