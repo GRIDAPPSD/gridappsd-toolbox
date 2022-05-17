@@ -33,9 +33,9 @@ request = {
 message = gapps.get_response(topic, request, timeout=90)
 ```
 
-## Service Output Response
+## Service Output Response Message
 
-The Static Y-bus response message format, with the ybus element being shortened from the full value,  is as follows:
+The Static Y-bus response message format, with the ybus element being shortened from the full value, is as follows:
 
 ```
 message = {
@@ -44,7 +44,9 @@ message = {
 }
 ```
 
-The ybus element directly maps to a Python dictionary of dimension 2 or a dictionary of a dictionary. The numeric values are the real and imaginary components of the Y-bus admittance for each sparse matrix entry. Note that GridAPPS-D serializes messages using the JSON data interchange format, but unfortunately complex values are not directly supported by JSON. Therefore, each complex value is instead serialized as a two-element tuple.  Further, only unique Y-bus entries are included in the response message that were determined by the Static Y-bus service to be part of the lower diagonal portion of the sparse matrix.  Therefore, most applications will need to both convert the tuples to complex numbers as well as populate the symmetric upper diagonal Y-bus entries to simplify working with the matrix in application code.  A function to do both of those steps along with the code for invoking that function given the response message at the end of the earlier code snippet is as follows:
+## Service Output Response Processing
+
+The ybus element directly maps to a Python dictionary of dimension 2 or a dictionary of a dictionary. The numeric values are the real and imaginary components of the Y-bus admittance for each sparse matrix entry. Note that GridAPPS-D serializes messages using the JSON data interchange format, but unfortunately complex values are not directly supported by JSON. Therefore, each complex value is instead serialized as a two-element tuple. Further, only unique Y-bus entries are included in the response message that were determined by the Static Y-bus service to be part of the lower diagonal portion of the sparse matrix. Therefore, most applications will need to both convert the tuples to complex numbers as well as populate the symmetric upper diagonal Y-bus entries to simplify working with the matrix in application code. A function to do both of those steps along with the code for invoking that function given the response message at the end of the earlier code snippet is as follows:
 
 ```
 def fullComplex(lowerUncomplex):
