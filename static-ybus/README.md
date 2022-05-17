@@ -6,11 +6,11 @@ Static Y-bus is a lightweight service that provides Y-bus complex system admitta
 
 Static Y-bus operates through the GridAPPS-D request/response messaging pattern. Applications request a Y-bus admittance matrix for a specified feeder, which is then constructed and returned by the GridAPPS-D API get_response call.
 
-Static Y-bus is started automatically when the GridAPPS-D platform is launched and therefore is always available to applications connected to the platform. Internally Y-bus admittance matrices are cached so that only the first request for a given model within a GridAPPS-D platform instance will result in the construction of the matrix. Subsequent requests from any application communicating with that platform instance will immediately return the cached Y-bus matrix that was previously built.
+Static Y-bus is started automatically when the GridAPPS-D platform is launched and therefore is always available to applications connected to the platform. Internally, Y-bus admittance matrices are cached so that only the first request for a given model within a GridAPPS-D platform instance will result in the construction of the matrix. Subsequent requests from any application communicating with that platform instance will immediately return the cached Y-bus matrix that was previously built.
 
-Because of the complexity in deriving the Y-bus matrix directly from the network equipment model, even for simple models it takes 15 to 45+ seconds for an application to receive the Y-bus response when it must be constructed for the initial request, longer for a large model. Caching of matrices therefore results in significantly better performance when there are repeated Y-bus requests.
+Because of the complexity in deriving the Y-bus matrix directly from the network equipment model, even for simple models it takes 15 to 45+ seconds for an application to receive the Y-bus response when it must be constructed for the initial request, longer times for larger model. Caching of matrices therefore results in significantly better performance when there are repeated Y-bus requests.
 
-An example Static Y-bus request/response is provided in the gridappsd-toolbox GitHub repo in static-ybus/test_sybus.py. The following documentation describes the usage of the Static Y-bus service, both the request and response including some limited response processing.
+An example Static Y-bus request/response is provided in the gridappsd-toolbox GitHub repo in static-ybus/test_sybus.py. The following documentation describes the usage of the Static Y-bus service, both the request and response including some basic response processing.
 
 ## Service Output Request
 
@@ -67,6 +67,6 @@ def fullComplex(lowerUncomplex):
 Ybus = fullComplex(message['ybus'])
 ```
 
-See the test_sybus.py script in the static-ybus directory of the gridappsd-toolbox GitHub repo for the complete example of requesting and processing a Y-bus response from the Static Y-bus service.
+See the test_sybus.py script in the static-ybus directory of the gridappsd-toolbox GitHub repo for the complete example of requesting and processing a Y-bus response from the Static Y-bus service, collecting together the snippets shown here.
 
 
