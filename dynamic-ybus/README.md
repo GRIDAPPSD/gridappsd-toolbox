@@ -80,7 +80,7 @@ After making the request via the get_response call and still within the \_\_init
     # do any processing after Ybus is initalized here
 ```
 
-The ybus element in the messages and ybusChanges in the update message directly maps to a Python dictionary of dimension 2 or a dictionary of a dictionary. The numeric values are the real and imaginary components of the Y-bus admittance for each sparse matrix entry. Note that GridAPPS-D serializes messages using the JSON data interchange format, but unfortunately complex values are not directly supported by JSON. Therefore, each complex value is instead serialized as a two-element tuple. Further, only unique Y-bus entries are included in the response message that were determined by the Dynamic Y-bus service to be part of the lower diagonal portion of the sparse matrix. Therefore, most applications will need to both convert the tuples to complex numbers as well as populate the symmetric upper diagonal Y-bus entries to simplify working with the matrix in application code. The fullComplexInit function converts the lower diagonal sparse Y-bus into a full symmetric Y-bus matrix along with creating complex values from the JSON serialized tuple elements:
+The ybus element in the messages and ybusChanges in the update message directly maps to a Python dictionary of dimension 2 or a dictionary of a dictionary. The numeric values are the real and imaginary components of the Y-bus admittance for each sparse matrix entry. Note that GridAPPS-D serializes messages using the JSON data interchange format, but unfortunately complex values are not directly supported by JSON. Therefore, each complex value is instead serialized as a two-element tuple. Further, only unique Y-bus entries are included in the messages that were determined by the Dynamic Y-bus service to be part of the lower diagonal portion of the sparse matrix. Therefore, most applications will need to both convert the tuples to complex numbers as well as populate the symmetric upper diagonal Y-bus entries to simplify working with the matrix in application code. The fullComplexInit function converts the lower diagonal sparse Y-bus into a full symmetric Y-bus matrix along with creating complex values from the JSON serialized tuple elements:
 
 ```
   def fullComplexInit(self, lowerUncomplex):
@@ -97,7 +97,7 @@ The ybus element in the messages and ybusChanges in the update message directly 
     return YbusInit
 ```
 
-The on_message function of the class receives the published Dynamic Y-bus updates. The three class variables with Init in the names that are initialized in the \_\_init__ function are used in on_message to be able to determine if the Y-bus returned by the get_response call is indeed the most recent. Dynamic Y-bus, as a help to applications, also publishes as "processStatus" message that denotes when the underlying simulation has finished and there will be no further Dynamic Y-bus messages for that simulation. The keepLooping function can be invoked outside the class to exit processing. The on_message fnd keepLooping functions are:
+The on_message function of the class receives the published Dynamic Y-bus updates. The three class variables with "Init" in the names that are declared in the \_\_init__ function are used in on_message to be able to determine if the Y-bus returned by the get_response call is indeed the most recent version. Dynamic Y-bus, as a help to applications, also publishes as "processStatus" message that denotes when the underlying simulation has finished and there will be no further Dynamic Y-bus messages for that simulation. The keepLooping function can be called as a while loop conditional loop outside the class to exit message processing. The on_message and keepLooping functions are:
 
 ```
   def on_message(self, header, message):
@@ -118,7 +118,7 @@ The on_message function of the class receives the published Dynamic Y-bus update
     return self.keepLoopingFlag
 ```
 
-The elif block of on_message handles any Dynamic Y-bus published messages before the starting Y-bus has been initialized while the else block handles all the published messages after Y-bus initialization. The fullComplexUpdate function is similar to fullComplexInit except it specifically processes just changes to the existing Y-bus where changes only update existing entries rather than creating new entries:
+The elif block in on_message handles any Dynamic Y-bus published messages before the starting Y-bus has been initialized while the else block handles all the published messages after Y-bus initialization. The fullComplexUpdate function is similar to fullComplexInit except it specifically processes just changes to the existing Y-bus where changes only update existing entries rather than creating new entries:
 
 ```
   def fullComplexUpdate(self, lowerUncomplex):
