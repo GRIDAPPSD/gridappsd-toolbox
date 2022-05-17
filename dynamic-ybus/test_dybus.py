@@ -20,17 +20,13 @@ class DYbusTester:
     gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus', simID), self)
 
     # request/response for snapshot Ybus
+    topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simID
     request = {
       "requestType": "GET_SNAPSHOT_YBUS"
     }
-    print('Requesting dynamic Ybus snapshot for sim_id: ' + simID + '\n', flush=True)
-    # TODO figure out if there is a GridAPPS-D compliant topic to use
-    topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simID
-    #topic = service_input_topic('gridappsd-dynamic-ybus', simID)
-    #topic = '/topic/goss.gridappsd.simulation.gridappsd-dynamic-ybus.' + simID + '.input'
-    #topic = 'goss.gridappsd.simulation.gridappsd-dynamic-ybus.' + simID + '.input'
+    print('Requesting Dynamic Ybus snapshot for sim_id: ' + simID + '\n', flush=True)
     message = gapps.get_response(topic, request, timeout=90)
-    print('Got dynamic Ybus snapshot response: ' + str(message) + '\n', flush=True)
+    print('Got Dynamic Ybus snapshot response: ' + str(message) + '\n', flush=True)
 
     if self.timestampPreInit > message['timestamp']:
       print('Dynamic Ybus initialized from an update message with timestamp: ' + str(self.timestampPreInit) + ', snapshot timestamp: ' + str(message['timestamp']) + '\n', flush=True)
@@ -102,12 +98,12 @@ def _main():
 
   dybus = DYbusTester(gapps, simID)
 
-  print('Starting dynamic Ybus monitoring loop...\n', flush=True)
+  print('Starting Dynamic Ybus monitoring loop...\n', flush=True)
 
   while dybus.keepLooping():
     time.sleep(0.1)
 
-  print('Finished dynamic Ybus monitoring loop.\n', flush=True)
+  print('Finished Dynamic Ybus monitoring loop.\n', flush=True)
 
   gapps.disconnect()
 
