@@ -32,9 +32,9 @@ def _main():
     "requestType": "GET_SNAPSHOT_YBUS",
     "feeder_id": feeder_mrid
   }
-  print('Requesting static Ybus for feeder_id: ' + feeder_mrid + '\n', flush=True)
+  print('Requesting Static Ybus for feeder_id: ' + feeder_mrid + '\n', flush=True)
   message = gapps.get_response(topic, request, timeout=90)
-  print('Got static Ybus snapshot response: ' + str(message) + '\n', flush=True)
+  print('Got Static Ybus snapshot response: ' + str(message) + '\n', flush=True)
 
   Ybus = fullComplex(message['ybus'])
   print('Ybus converted from lower diagonal to full with complex values:', flush=True)
