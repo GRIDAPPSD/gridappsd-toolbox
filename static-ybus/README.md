@@ -17,7 +17,7 @@ An example Static Y-bus request/response is provided in the gridappsd-toolbox Gi
 Request Y-bus matrix
 The following code snippet shows the topic and request format for returning the static Y-bus for a specified feeder mrid:
 
-'''
+```
 from gridappds import GridAPPSD
 
 gapps = GridAPPSD()
@@ -32,7 +32,7 @@ request = {
 }
 
 message = gapps.get_response(topic, request, timeout=90)
-'''
+```
 
 ## Service Output Response
 
