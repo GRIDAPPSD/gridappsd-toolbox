@@ -15,6 +15,24 @@ An example Static Y-bus request/response is provided in the gridappsd-toolbox Gi
 ## Service Output Request
 
 Request Y-bus matrix
+The following code snippet shows the topic and request format for returning the static Y-bus for a specified feeder mrid:
+
+'''
+from gridappds import GridAPPSD
+
+gapps = GridAPPSD()
+
+feeder_mrid = "_5B186B93-7A5F-B64C-8640-47C17D6E4B0F" #_ieee13assets
+
+topic = "goss.gridappsd.request.data.static-ybus"
+
+request = {
+  "requestType": "GET_SNAPSHOT_YBUS",
+  "feeder_id": feeder_mrid
+}
+
+message = gapps.get_response(topic, request, timeout=90)
+'''
 
 ## Service Output Response
 
