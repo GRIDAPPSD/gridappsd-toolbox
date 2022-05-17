@@ -14,15 +14,14 @@ An example Static Y-bus request/response is provided in the gridappsd-toolbox Gi
 
 ## Service Output Request
 
-Request Y-bus matrix
-The following code snippet shows the topic and request format for returning the static Y-bus for a specified feeder mrid:
+The following code snippet shows the topic and request format for returning the static Y-bus for a specified feeder id:
 
 ```
 from gridappds import GridAPPSD
 
 gapps = GridAPPSD()
 
-feeder_mrid = "_5B186B93-7A5F-B64C-8640-47C17D6E4B0F" #_ieee13assets
+feeder_mrid = "_5B186B93-7A5F-B64C-8640-47C17D6E4B0F" #ieee13assets
 
 topic = "goss.gridappsd.request.data.static-ybus"
 
@@ -36,5 +35,33 @@ message = gapps.get_response(topic, request, timeout=90)
 
 ## Service Output Response
 
-Response Y-bus matrix format
+The static Y-bus response message format is as follows:
+
+```
+message = {
+  "feeder_id": "_5B816B93-7A5F-B64C-8460-47C17D6E4B0F",
+  "ybus": {"646.2": {"645.2": [-7.177543473834806, 6.6777250702760815], "646.2": [7.177543473834806, -6.6777250702760815], "645.3": [2.408564072415804, -0.9996874529053109]}, "645.2": {"645.2": [11.468753101398052, -10.603388331034477]}, "645.3": {"645.2": [-3.8413662321995776, 1.5680292873844999], "645.3": [11.547403560992565, -10.5543166996104]},...}
+}
+```
+
+The ybus element of the message directly maps to a Python dictionary of dimension 2 or a dictionary of a dictionary. The individual are the real and imaginary components of the Y-bus admittance for each entry. Note that GridAPPS-D serializes messages using the JSON data interchange format, but unfortunately complex values are not directly supported by JSON. Therefore, each complex value is instead serialized as a two-element tuple.  Further, only unique Y-bus entries are included in the response message that were determined by the Static Y-bus service to be part of the lower diagonal.  Therefore, many applications will need to both convert back the tuples of real and imaginary components to complex numbers as well as populate the symmetric upper diagonal Y-bus entries to simplify working with the Y-bus matrix.  A code snippet with a function to do both of those steps along with the code for invoking that function after getting the response message is as follows:
+
+```
+def fullComplex(lowerUncomplex):
+  YbusComplex = {}
+
+  for noderow in lowerUncomplex:
+    for nodecol,value in lowerUncomplex[noderow].items():
+      if noderow not in YbusComplex:
+        YbusComplex[noderow] = {}
+      if nodecol not in YbusComplex:
+        YbusComplex[nodecol] = {}
+      YbusComplex[noderow][nodecol] = YbusComplex[nodecol][noderow] = complex(value[0], value[1])
+
+  return YbusComplex
+
+
+# invoke function to build full Y-bus with complex values
+Ybus = fullComplex(message['ybus'])
+```
 
