@@ -14,9 +14,9 @@ Dynamic Y-bus is started with a simulation by the GridAPPS-D platform when it is
     ]
 ```
 
-When the simulation is started and Dynamic Y-bus service is selected to run, the service will immediately request (without any application interaction) an initial or starting Y-bus from the Static Y-bus service that Dynamic Y-bus itself maintains internally (updating during the course of the simulation) for request/response and subscribe/publish messaging with any applications using the service. Because Static Y-bus may take 15 to 45+ seconds to construct this Y-bus if there have been no previous requests (meaning Static Y-bus does not have a cached matrix to immediately return) for the specified feeder id, it can also take this long for the Dynamic Y-bus service to return a starting Y-bus from an initial application request. If there have been either previous Dynamic Y-bus or Static Y-bus requests for the given feeder id for the GridAPPS-D platform instance, the initial response with a starting Y-bus will happen right away.
+When the simulation is started and Dynamic Y-bus service is selected to run, the service will immediately request (without any application interaction) an initial or starting Y-bus from the Static Y-bus service that Dynamic Y-bus will then maintain internally (updating during the course of the simulation) for request/response and subscribe/publish messaging with any applications using the service. Because Static Y-bus may take 15 to 45+ seconds to construct this Y-bus if there have been no previous requests (meaning Static Y-bus does not have a cached matrix to immediately return) for the specified feeder id, it can also take this long for the Dynamic Y-bus service to return a starting Y-bus from an initial application request. If there have been either previous Dynamic Y-bus or Static Y-bus requests for the given feeder id for the GridAPPS-D platform instance, the initial response with a starting Y-bus will happen right away.
 
-An example Dynamic Y-bus request/response and subscribe/publish workflow is provided in the gridappsd-toolbox GitHub repo in dynamic-ybus/test_dybus.py. The following documentation describes the usage of the Dynamic Y-bus service adhering to the recommended workflow insuring an up-to-date Y-bus is maintained.
+An example Dynamic Y-bus request/response and subscribe/publish workflow is provided in the gridappsd-toolbox GitHub repo in dynamic-ybus/test_dybus.py. The following documentation describes the usage of the Dynamic Y-bus service adhering to the recommended workflow insuring an up-to-date Y-bus throughout simulation execution.
 
 ## Service Output Request and Subscribe
 
@@ -68,7 +68,7 @@ message = {
 }
 ```
 
-Note the update message contains both ybus and ybusChanges elements.  Normally applications only need to process one or the other and the workflow described below uses ybusChanges only once the starting Y-bus has been initialized. Using ybusChanges speeds processing for Dynamic Y-bus update messages notably for large models and also allows applications to be optimized by only considering changed Y-bus elements.
+Note the update message contains both ybus and ybusChanges elements.  Normally applications only need to process one or the other and the workflow described below uses ybusChanges only once the starting Y-bus has been initialized. Using ybusChanges speeds processing of Dynamic Y-bus update messages notably for large models and also allows applications to be optimized by only considering changed Y-bus elements.
 
 ## Service Output Response and Published Update Processing
 
@@ -103,7 +103,7 @@ The ybus element in the messages and ybusChanges in the update message directly 
     return YbusInit
 ```
 
-The on_message function of the class receives the published Dynamic Y-bus updates. The three class variables with "Init" in the names that are declared in the \_\_init__ function are used in on_message to be able to determine if the Y-bus returned by the get_response call is indeed the most recent version. Dynamic Y-bus, as a help to applications, also publishes as "processStatus" message that denotes when the underlying simulation has finished and there will be no further Dynamic Y-bus messages for that simulation. The keepLooping function can be called as a while loop conditional loop outside the class to exit message processing. The on_message and keepLooping functions are:
+The on_message function of the class receives the published Dynamic Y-bus updates. The three class variables with "Init" in the names that are declared in the \_\_init__ function are set in on_message to later determine if the Y-bus returned by the get_response call is indeed the most recent version. Dynamic Y-bus, as a help to applications, also publishes as "processStatus" message that denotes when the underlying simulation has finished and there will be no further Dynamic Y-bus messages for that simulation. The keepLooping function can be called as a while loop conditional statement outside the class to exit message processing. The on_message and keepLooping functions are:
 
 ```
   def on_message(self, header, message):
@@ -133,5 +133,5 @@ The elif block in on_message handles any Dynamic Y-bus published messages before
         self.Ybus[noderow][nodecol] = self.Ybus[nodecol][noderow] = complex(value[0], value[1])
 ```
 
-See the test_dybus.py script in the dynamic-ybus directory of the gridappsd-toolbox GitHub repo for the complete workflow example for the Dynamic Y-bus service.
+See the test_dybus.py script in the dynamic-ybus directory of the gridappsd-toolbox GitHub repo for the complete workflow example for the Dynamic Y-bus service, collecting together the snippets shown here.
 
