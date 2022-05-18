@@ -168,6 +168,149 @@ class SimWrapper(object):
     print('')
 
 
+  def process_switches(self, msgdict, YbusChanges):
+    switchOpenValue = complex(0,0)
+    switchClosedValue = complex(-500,500)
+
+    # Switch processing
+    for mrid in self.SwitchMridToNodes:
+      try:
+        value = msgdict['measurements'][mrid]['value']
+        nodes = self.SwitchMridToNodes[mrid] # two endpoints for switch
+        #print('Found switch mrid: ' + mrid + ', nodes: ' + str(nodes) + ', value: ' + str(value), flush=True)
+        if value == 0: # open
+          if not self.checkSwitchOpen(nodes):
+            print('Switch value changed from closed to open for nodes: ' + str(nodes), flush=True)
+            Yval_diag = -self.Ybus[nodes[0]][nodes[1]]
+            print('1' + str(nodes), flush=True)
+            self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchOpenValue
+            print('2' + str(nodes), flush=True)
+            # Modify diagonal terms for both endpoints
+            self.Ybus[nodes[0]][nodes[0]] -= Yval_diag
+            print('3' + str(nodes), flush=True)
+            self.Ybus[nodes[1]][nodes[1]] -= Yval_diag
+            print('4' + str(nodes), flush=True)
+
+            if nodes[0] not in YbusChanges:
+              print('5' + str(nodes), flush=True)
+              YbusChanges[nodes[0]] = {}
+              print('6' + str(nodes), flush=True)
+            if nodes[1] not in YbusChanges:
+              print('7' + str(nodes), flush=True)
+              YbusChanges[nodes[1]] = {}
+              print('8' + str(nodes), flush=True)
+            YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchOpenValue
+            print('9' + str(nodes), flush=True)
+
+            YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
+            print('0' + str(nodes), flush=True)
+            YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
+            print('01' + str(nodes), flush=True)
+
+        else: # closed
+          if not self.checkSwitchClosed(nodes):
+            print('Switch value changed from open to closed for nodes: ' + str(nodes), flush=True)
+            self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchClosedValue
+            self.Ybus[nodes[0]][nodes[0]] += -switchClosedValue
+            self.Ybus[nodes[1]][nodes[1]] += -switchClosedValue
+
+            if nodes[0] not in YbusChanges:
+              YbusChanges[nodes[0]] = {}
+            if nodes[1] not in YbusChanges:
+              YbusChanges[nodes[1]] = {}
+            YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchClosedValue
+            YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
+            YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
+
+      except:
+        if mrid not in msgdict['measurements']:
+          print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+        elif 'value' not in msgdict['measurements'][mrid]:
+          print('*** WARNING: Did not find value element for switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+        else:
+          print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+    return
+
+
+  def process_transformers(self, msgdict, YbusChanges):
+    # Transformer processing
+    for mrid in self.TransformerMridToNodes:
+      try:
+        value = msgdict['measurements'][mrid]['value']
+        nodes = self.TransformerMridToNodes[mrid]
+        node1 = nodes[0]
+        node2 = nodes[1]
+        #print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+        if value != self.TransformerLastPos[nodes[1]]:
+          print('Transformer value changed for node: ' + node2 + ', old value: ' + str(self.TransformerLastPos[node2]) + ', new value: ' + str(value), flush=True)
+          # calculate the admittance multiplier based on the change in the tap
+          # position, last value vs. new value
+          old_tap = (1.0 + self.TransformerLastPos[node2]*0.00625)
+          new_tap = (1.0 + value*0.00625)
+          posMultiplier = old_tap / new_tap
+          self.TransformerLastPos[node2] = value
+
+          # Update the entries of system Ybus for the given tap change
+          # 1. The off-diagonal element (two terminals of xfmr)
+          Yval_offdiag = self.Ybus[node1][node2]
+          self.Ybus[node1][node2] = self.Ybus[node2][node1] = Yval_offdiag * posMultiplier
+          # 2. The diagonal element of a regulating node
+          Yval_diag = - Yval_offdiag / old_tap
+          diff = self.Ybus[node2][node2] - Yval_diag
+          self.Ybus[node2][node2] = - Yval_offdiag * old_tap / (new_tap ** 2) + diff
+
+          if node1 not in YbusChanges:
+            YbusChanges[node1] = {}
+          if node2 not in YbusChanges:
+            YbusChanges[node2] = {}
+          YbusChanges[node1][node2] = YbusChanges[node2][node1] = self.Ybus[node1][node2]
+          YbusChanges[node2][node2] = self.Ybus[node2][node2]
+
+      except:
+        if mrid not in msgdict['measurements']:
+          print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+        elif 'value' not in msgdict['measurements'][mrid]:
+          print('*** WARNING: Did not find value element for transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+        else:
+          print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+    return
+
+
+  def process_capacitors(self, msgdict, YbusChanges):
+    # Capacitor (LinearShuntCompensator) processing
+    for mrid in self.CapacitorMridToNode:
+      try:
+        value = msgdict['measurements'][mrid]['value']
+        noderow = self.CapacitorMridToNode[mrid]
+        #print('Found capacitor mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+        if value == 0: # off
+          if self.CapacitorLastValue[noderow] == 1:
+            print('Capacitor value changed from on to off for node: ' + noderow, flush=True)
+            self.CapacitorLastValue[noderow] = value
+            self.Ybus[noderow][noderow] -= self.CapacitorMridToYbusContrib[mrid]
+            if noderow not in YbusChanges:
+              YbusChanges[noderow] = {}
+            YbusChanges[noderow][noderow] = self.Ybus[noderow][noderow]
+
+        elif value == 1: # on
+          if self.CapacitorLastValue[noderow] == 0:
+            print('Capacitor value changed from off to on for node: ' + noderow, flush=True)
+            self.CapacitorLastValue[noderow] = value
+            self.Ybus[noderow][noderow] += self.CapacitorMridToYbusContrib[mrid]
+            if noderow not in YbusChanges:
+              YbusChanges[noderow] = {}
+            YbusChanges[noderow][noderow] = self.Ybus[noderow][noderow]
+
+      except:
+        if mrid not in msgdict['measurements']:
+          print('*** WARNING: Did not find capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+        elif 'value' not in msgdict['measurements'][mrid]:
+          print('*** WARNING: Did not find value element for capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+        else:
+          print('*** WARNING: Unknown exception processing capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+    return
+
+
   def on_message(self, header, message):
     # TODO workaround for broken unsubscribe method
     if not self.keepLoopingFlag:
@@ -190,130 +333,13 @@ class SimWrapper(object):
       #   making dynamic YBus aware of Topology Processor as I'm not sure
       #   of the need for this otherwise
 
-      switchOpenValue = complex(0,0)
-      switchClosedValue = complex(-500,500)
-
       YbusChanges = {} # minimal set of Ybus changes for timestamp
 
-      # Switch processing
-      for mrid in self.SwitchMridToNodes:
-        try:
-          value = msgdict['measurements'][mrid]['value']
-          nodes = self.SwitchMridToNodes[mrid] # two endpoints for switch
-          #print('Found switch mrid: ' + mrid + ', nodes: ' + str(nodes) + ', value: ' + str(value), flush=True)
-          if value == 0: # open
-            if not self.checkSwitchOpen(nodes):
-              print('Switch value changed from closed to open for nodes: ' + str(nodes), flush=True)
-              Yval_diag = -self.Ybus[nodes[0]][nodes[1]]
-              self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchOpenValue
-              # Modify diagonal terms for both endpoints
-              self.Ybus[nodes[0]][nodes[0]] -= Yval_diag
-              self.Ybus[nodes[1]][nodes[1]] -= Yval_diag
+      self.process_switches(msgdict, YbusChanges)
 
-              if nodes[0] not in YbusChanges:
-                YbusChanges[nodes[0]] = {}
-              if nodes[1] not in YbusChanges:
-                YbusChanges[nodes[1]] = {}
-              YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchOpenValue
+      self.process_transformers(msgdict, YbusChanges)
 
-              YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
-              YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
-
-          else: # closed
-            if not self.checkSwitchClosed(nodes):
-              print('Switch value changed from open to closed for nodes: ' + str(nodes), flush=True)
-              self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchClosedValue
-              self.Ybus[nodes[0]][nodes[0]] += -switchClosedValue
-              self.Ybus[nodes[1]][nodes[1]] += -switchClosedValue
-
-              if nodes[0] not in YbusChanges:
-                YbusChanges[nodes[0]] = {}
-              if nodes[1] not in YbusChanges:
-                YbusChanges[nodes[1]] = {}
-              YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchClosedValue
-              YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
-              YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
-
-        except:
-          if mrid not in msgdict['measurements']:
-            print('*** WARNING: Did not find switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
-          elif 'value' not in msgdict['measurements'][mrid]:
-            print('*** WARNING: Did not find value element for switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
-          else:
-            print('*** WARNING: Unknown exception processing switch mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
-
-      # Transformer processing
-      for mrid in self.TransformerMridToNodes:
-        try:
-          value = msgdict['measurements'][mrid]['value']
-          nodes = self.TransformerMridToNodes[mrid]
-          node1 = nodes[0]
-          node2 = nodes[1]
-          #print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
-          if value != self.TransformerLastPos[nodes[1]]:
-            print('Transformer value changed for node: ' + node2 + ', old value: ' + str(self.TransformerLastPos[node2]) + ', new value: ' + str(value), flush=True)
-            # calculate the admittance multiplier based on the change in the tap
-            # position, last value vs. new value
-            old_tap = (1.0 + self.TransformerLastPos[node2]*0.00625)
-            new_tap = (1.0 + value*0.00625)
-            posMultiplier = old_tap / new_tap
-            self.TransformerLastPos[node2] = value
-
-            # Update the entries of system Ybus for the given tap change
-            # 1. The off-diagonal element (two terminals of xfmr)
-            Yval_offdiag = self.Ybus[node1][node2]
-            self.Ybus[node1][node2] = self.Ybus[node2][node1] = Yval_offdiag * posMultiplier
-            # 2. The diagonal element of a regulating node
-            Yval_diag = - Yval_offdiag / old_tap
-            diff = self.Ybus[node2][node2] - Yval_diag
-            self.Ybus[node2][node2] = - Yval_offdiag * old_tap / (new_tap ** 2) + diff
-
-            if node1 not in YbusChanges:
-              YbusChanges[node1] = {}
-            if node2 not in YbusChanges:
-              YbusChanges[node2] = {}
-            YbusChanges[node1][node2] = YbusChanges[node2][node1] = self.Ybus[node1][node2]
-            YbusChanges[node2][node2] = self.Ybus[node2][node2]
-
-        except:
-          if mrid not in msgdict['measurements']:
-            print('*** WARNING: Did not find transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
-          elif 'value' not in msgdict['measurements'][mrid]:
-            print('*** WARNING: Did not find value element for transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
-          else:
-            print('*** WARNING: Unknown exception processing transformer mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
-
-      # Capacitor (LinearShuntCompensator) processing
-      for mrid in self.CapacitorMridToNode:
-        try:
-          value = msgdict['measurements'][mrid]['value']
-          noderow = self.CapacitorMridToNode[mrid]
-          #print('Found capacitor mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
-          if value == 0: # off
-            if self.CapacitorLastValue[noderow] == 1:
-              print('Capacitor value changed from on to off for node: ' + noderow, flush=True)
-              self.CapacitorLastValue[noderow] = value
-              self.Ybus[noderow][noderow] -= self.CapacitorMridToYbusContrib[mrid]
-              if noderow not in YbusChanges:
-                YbusChanges[noderow] = {}
-              YbusChanges[noderow][noderow] = self.Ybus[noderow][noderow]
-
-          elif value == 1: # on
-            if self.CapacitorLastValue[noderow] == 0:
-              print('Capacitor value changed from off to on for node: ' + noderow, flush=True)
-              self.CapacitorLastValue[noderow] = value
-              self.Ybus[noderow][noderow] += self.CapacitorMridToYbusContrib[mrid]
-              if noderow not in YbusChanges:
-                YbusChanges[noderow] = {}
-              YbusChanges[noderow][noderow] = self.Ybus[noderow][noderow]
-
-        except:
-          if mrid not in msgdict['measurements']:
-            print('*** WARNING: Did not find capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
-          elif 'value' not in msgdict['measurements'][mrid]:
-            print('*** WARNING: Did not find value element for capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
-          else:
-            print('*** WARNING: Unknown exception processing capacitor mrid: ' + mrid + ' in measurement for timestamp: ' + str(self.timestamp), flush=True)
+      self.process_capacitors(msgdict, YbusChanges)
 
       if len(YbusChanges) > 0: # Ybus changed if there are any entries
         if not self.ybusInitFlag:
