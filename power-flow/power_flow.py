@@ -38,7 +38,7 @@
 # UNITED STATES DEPARTMENT OF ENERGY under Contract DE-AC05-76RL01830
 # ------------------------------------------------------------------------------
 """
-Created on May 19, 2022
+Created on June 6, 2022
 
 @author: Rohit Jinsiwale
 """""
@@ -58,7 +58,7 @@ from gridappsd import GridAPPSD
 from gridappsd import DifferenceBuilder
 from gridappsd.topics import simulation_input_topic
 from gridappsd.topics import simulation_output_topic
-from gridappsd.topics import service_output_topic, service_input_topic
+from gridappsd.topics import service_output_topic, service_input_topic,simulation_log_topic
 
 
 def pol2cart(rho, phi):
@@ -68,6 +68,59 @@ def cart2pol(cart):
     rho = np.sqrt(np.real(cart)**2 + np.imag(cart)**2)
     phi = np.arctan2(np.imag(cart), np.real(cart))
     return (rho, phi)
+
+class SimWrapper(object):
+    def __init__(self,gapps,feeder_mrid,simulation_id,PFobject):
+        self.gapps=gapps
+        self.feeder_mrid=feeder_mrid
+        self.simulation_id=simulation_id
+        self.timestamp=0
+        #self.Ybusinit=False
+        self.publish_to_topic=service_output_topic('gridappsd-power-flow',simulation_id)
+        self.keepLoopingFlag=True
+        self.PFobject=PFobject
+        self.newchange=False
+    
+    def on_message(self,header,message):
+        if not self.keepLoopingFlag:
+            return
+        
+        
+        if 'processStatus' in message:
+            status = message['processStatus']
+            if status=='COMPLETE' or status=='CLOSED':
+                self.keepLoopingFlag = False
+                message={
+                    'feeder_id':self.feeder_mrid,
+                    'simulation_id':self.simulation_id,
+                    'processStatus':status
+                }
+                self.gapps.send(self.publish_to_topic,message)
+                print('\nStatus published message:',flush=True)
+                print(message,flush=True)
+                print('')
+        
+        else:
+            
+            msgdict=message['message']
+            self.timestamp=msgdict['timestamp']
+            print('Processing simulation timestamp: '+str(self.timestamp),flush=True)
+            if self.PFobject.PFcomplete and self.newchange:
+                message={
+                    'feeder_id':self.feeder_mrid,
+                    'simulation_id':self.simulation_id,
+                    'timestamp':self.timestamp,
+                    'powerflow':self.PFobject.PFsolution
+                }
+                self.gapps.send(self.publish_to_topic,message)
+                print('\nPower Flow published message:',flush=True)
+                print(message,flush=True)
+                print('')
+            self.newchange=False
+
+        
+
+
 
 class SimCheckWrapper(object):
     def __init__(self, Sinj, PNVmag, RegMRIDs, CondMRIDs, PNVmRIDs, PNVdict):
@@ -136,6 +189,7 @@ class PowerFlow(object):
         self.feeder_mrid=feeder_mrid
         self.simulation_id=simulation_id
         self.Ybusinit=False
+        self.PFcomplete=False
         print('Requesting Ybus from Dynamic-Ybus Service\n')
         gapps=GridAPPSD()
         gapps.subscribe(service_output_topic('gridappsd-dynamic-ybus', simulation_id),self.ybusChangesCallback)
@@ -145,7 +199,16 @@ class PowerFlow(object):
         topic = 'goss.gridappsd.request.data.dynamic-ybus.' + simulation_id
         message = gapps.get_response(topic, request, timeout=90)
         self.Ylast=self.tupletocomplex(message['ybus'])
+
+        gapps_sim=GridAPPSD()
+
+        self.simtrack=SimWrapper(gapps_sim,self.feeder_mrid,self.simulation_id,self)
+        topic = 'goss.gridappsd.request.data.power-flow.' + simulation_id
+        req_id=gapps.subscribe(topic,self)
         
+        out_id=gapps_sim.subscribe(simulation_output_topic(self.simulation_id),self.simtrack)
+        log_id=gapps_sim.subscribe(simulation_log_topic(self.simulation_id),self.simtrack)
+
         if(len(self.Ylast)>0):
             self.Ybusinit=True
             print('Ybus has been initialized')
@@ -156,6 +219,9 @@ class PowerFlow(object):
         while self.SimNotComplete:
             time.sleep(0.1)
         
+        gapps.unsubscribe(req_id)
+        gapps_sim.unsubscribe(out_id)
+        gapps_sim.unsubscribe(log_id)
         gapps.disconnect()
 
         return
@@ -180,7 +246,7 @@ class PowerFlow(object):
                 
                 if self.Ybusinit:
                     Ychanges=self.tupletocomplex(message['ybusChanges'])
-                    print('Recieved changes to the Ybus from the Dynamic Y-bus service at time stamp'+ str(message['timestamp'])+'\n')
+                    print('Recieved changes to the Ybus from the Dynamic Y-bus service at time stamp '+ str(message['timestamp'])+'\n')
                     print(Ychanges)
                     print('\n\n')
                     for bus1 in Ychanges:
@@ -188,7 +254,10 @@ class PowerFlow(object):
                             self.Ylast[bus1][bus2]=Ychanges[bus1][bus2]
                     #print('Recieved Ybus update at time stamp'+ str(message['timestamp']))
                     print('Re-solving power flow for updated system')
+                    
                     self.runpowerflow()
+
+                    self.simtrack.newchange=True
                     
                     
     
@@ -413,7 +482,7 @@ class PowerFlow(object):
 
         k = 1
         maxdiff = 1.0
-
+        self.PFsolution={}
         while k<Nfpi and maxdiff>tolerance:
             Iload_tot = np.conj(Sinj / Vfpi[:,k-1])
             Iload_z = -Yinj_nom * Vfpi[:,k-1]
@@ -444,15 +513,19 @@ class PowerFlow(object):
 
         if k == Nfpi:
             print("\nDid not converge with k: " + str(k))
+            self.PFcomplete="Did not converge"
             return
 
         # set the final Vpfi index
         k -= 1
+        
         #print("\nconverged k: " + str(k),flush=True)
         print("\nVfpi:",flush=True)
         for key, value in Node2idx.items():
             rho, phi = cart2pol(Vfpi[value,k])
             print(key + ': rho: ' + str(rho) + ', phi: ' + str(math.degrees(phi)),flush=True)
+            self.PFsolution[key]={}
+            self.PFsolution[key]=(str(rho),str(math.degrees(phi)))
             #print('index: ' + str(value) + ', sim mag: ' + str(PNVmag[value]),flush=True)
 
         #print("\nVfpi rho to sim magnitude CSV:")
@@ -463,9 +536,32 @@ class PowerFlow(object):
                 #print(str(value) + ',' + key + ',' + str(rho) + ',' + str(mag),flush=True)
                 #print(str(value) + ',' + key + ',' + str(rho),flush=True)
         print('\n \n')
+
+        self.PFcomplete=True
         gapps.disconnect()
         return
     
+    def on_message(self,headers,message):
+        
+        reply_to = headers['reply-to']
+        #print(reply_to)
+        if message['requestType'] == 'GET_SNAPSHOT_POWERFLOW':
+            #print('Waiting for PF')
+            while not self.PFcomplete:
+                time.sleep(0.1)
+            message={
+                'feeder_id':self.feeder_mrid,
+                'simulation_id':self.simulation_id,
+                'timestamp':self.simtrack.timestamp,
+                'powerflow':self.PFsolution
+            }
+            #print(message)
+            print('Sending last power flow solution for timestamp'+ str(self.simtrack.timestamp),flush=True)
+            self.simtrack.gapps.send(reply_to,message)
+        else:
+            message="No valid requestType specified"
+
+
 def _main():
       
     if (os.path.isdir('shared')):
