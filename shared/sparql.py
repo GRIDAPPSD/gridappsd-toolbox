@@ -6,9 +6,8 @@ import re
 from gridappsd import GridAPPSD, topics, utils
 
 class SPARQLManager:
-    """Class for querying and parsing SPARQL in GridAPPS-D.
+    """Class for querying SPARQL in GridAPPS-D Toolbox tools/services
     """
-
     
     def __init__(self, gapps, feeder_mrid, simulation_id=None, timeout=30):
         """Connect to the platform.
@@ -34,6 +33,8 @@ class SPARQLManager:
         self.simulation_id = simulation_id
 
         #self.topic = "goss.gridappsd.process.request.data.powergridmodel"
+
+# Start of Power Flow queries
 
     def query_transformers(self):
         """Get information on transformers in the feeder."""
@@ -106,6 +107,7 @@ class SPARQLManager:
         all_Transformers = pte + tte
         output = pd.DataFrame(all_Transformers)
         return output
+
     
     def query_der(self):
         """Get information on all kinds of DERs in the feeder."""
@@ -160,6 +162,7 @@ class SPARQLManager:
         all_der = inv_der + machine_der
         output = pd.DataFrame(all_der)
         return output
+
     
     def query_energyconsumer(self):
         """Get information on loads in the feeder."""
@@ -207,6 +210,7 @@ class SPARQLManager:
         output = pd.DataFrame(list_of_dicts)
         return output
 
+
     def query_energyconsumer_lf(self):
         """Get information on loads in the feeder."""
         # Perform the query.
@@ -249,6 +253,7 @@ class SPARQLManager:
         bindings = results['data']['results']['bindings']
         return bindings
 
+
     def acline_measurements(self, logfile):
         message = {
             "modelId": self.feeder_mrid,
@@ -269,6 +274,7 @@ class SPARQLManager:
             print('ACLINE_MEASUREMENTS current Measurements (A) are missing for ACLineSegment', file=logfile)
             return 
         
+
     def acline_rating_query(self):
         # Getting the Ratings for ACLineSegment
         AC_LINE_QUERY = """
@@ -306,6 +312,7 @@ class SPARQLManager:
         rating_query = pd.DataFrame(list_of_dicts)
         return rating_query
 
+
     def graph_query(self):
         TERMINAL_QUERY = """
         PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -338,6 +345,7 @@ class SPARQLManager:
         graph_query = pd.DataFrame(list_of_dicts)
         return list_of_dicts
         
+
     def opensw(self):
         OPENSW_QUERY = """
         PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -365,6 +373,7 @@ class SPARQLManager:
         list_of_dicts = [sw['name'] for sw in list_of_dicts if sw['open'] == 'true']
         return list_of_dicts
     
+
     def sourcebus_query(self):
         SOURCE_QUERY = """
         PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -395,6 +404,7 @@ class SPARQLManager:
         sourcebus = bindings[0]['bus']['value']
         vang = float(bindings[0]['vang']['value'])
         return sourcebus, vang
+
 
     def nomv_query(self):
         EQ_VNOM_QUERY = """
@@ -442,7 +452,6 @@ class SPARQLManager:
         bindings2 = results['data']['results']['bindings'] 
         return bindings1 + bindings2
 
-
     
     def switch_query(self):
         LBS_QUERY = """
@@ -480,6 +489,7 @@ class SPARQLManager:
             list_of_dicts.append({k:v['value'] for (k, v) in obj.items()})
         return list_of_dicts
 
+
     def switch_meas_query(self):
         message = {
         "modelId": self.feeder_mrid,
@@ -491,6 +501,7 @@ class SPARQLManager:
         obj_msr_loadsw = [d for d in obj_msr_loadsw if d['type'] == 'Pos']
         return obj_msr_loadsw
 
+
     def capacitor_ids_query(self):
         message = {
         "modelId": self.feeder_mrid,
@@ -501,6 +512,7 @@ class SPARQLManager:
         cap_ids = cap_ids['data']['objectIds']
         return cap_ids
 	
+
     def PowerTransformerEnd_xfmr_admittances(self):		
         VALUES_QUERY = """		
         PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>		
@@ -523,6 +535,7 @@ class SPARQLManager:
         results = self.gad.query_data(VALUES_QUERY)		
         bindings = results['data']['results']['bindings']		
         return bindings
+
 
     def TransformerTank_xfmr_nlt(self):
         VALUES_QUERY = """
@@ -552,6 +565,7 @@ class SPARQLManager:
         bindings = results['data']['results']['bindings']
         return bindings
 
+
     def regid_query(self):
         REGID_QUERY = """
         PREFIX r:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -580,6 +594,10 @@ class SPARQLManager:
         results = self.gad.query_data(REGID_QUERY)
         bindings = results['data']['results']['bindings']
         return bindings
+
+# End of Power Flow queries
+
+# Start of Static/Dynamic Y-bus queries
 
     def PerLengthPhaseImpedance_line_names(self):
         LINES_QUERY = """
@@ -1279,4 +1297,6 @@ class SPARQLManager:
 
         results = self.gad.get_response('goss.gridappsd.process.request.config', message, timeout=1200)
         return results['data']['feeders']
+
+# End of Static/Dynamic Y-bus queries
 
