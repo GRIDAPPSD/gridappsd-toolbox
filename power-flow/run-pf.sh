@@ -67,10 +67,11 @@ fi
 #python3 shunt_element_validator/shunt_element_validator.py --request "$SIMREQ" --simid $SIMID 2>&1 | tee validator.log
 # invoke load_flow_validator with "./run-validator 9500 nosim"
 #python3 ../dynamic-ybus/dynamic_ybus.py --request "$SIMREQ" --simid $SIMID >/dev/null 2>&1 | tee dybus.log &
-python3 power_flow.py --request "$SIMREQ" --simid $SIMID 2>&1 | tee powerflow.log
-# End of Ybus based validation
+pushd .
+cd ../dynamic-ybus
+python3 dynamic_ybus.py $SIMID "$SIMREQ" --api 2>&1 >/dev/null &
+popd
 
-if [[ ! -z "$SIMID" ]]; then
-    # kill microservices so that it starts up with the new simulation next time
-    pkill -f microservices.py -U $USER
-fi
+#python3 power_flow.py --request "$SIMREQ" --simid $SIMID 2>&1 | tee powerflow.log
+python3 power_flow.py $SIMID "$SIMREQ" 2>&1 | tee powerflow.log
+# End of Ybus based validation
