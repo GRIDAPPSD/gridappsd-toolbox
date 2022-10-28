@@ -23,9 +23,9 @@ else
 fi
 
 # this version invokes static ybus as an API call
-#python3 dynamic_ybus.py $SIMID "$SIMREQ" --api 2>&1 | tee dybus.log
+python3 dynamic_ybus.py $SIMID "$SIMREQ" --api 2>&1 | tee dybus.log
 # this version invokes static ybus as a service
 #python3 dynamic_ybus.py $SIMID "$SIMREQ" 2>&1 | tee dybus.log
 # to test dynamic ybus if the service is started from the platform
-./test_dybus.py $SIMID
+#./test_dybus.py $SIMID
 
