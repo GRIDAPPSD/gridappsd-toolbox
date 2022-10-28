@@ -182,30 +182,19 @@ class SimWrapper(object):
           if not self.checkSwitchOpen(nodes):
             print('Switch value changed from closed to open for nodes: ' + str(nodes), flush=True)
             Yval_diag = -self.Ybus[nodes[0]][nodes[1]]
-            print('1' + str(nodes), flush=True)
             self.Ybus[nodes[0]][nodes[1]] = self.Ybus[nodes[1]][nodes[0]] = switchOpenValue
-            print('2' + str(nodes), flush=True)
             # Modify diagonal terms for both endpoints
             self.Ybus[nodes[0]][nodes[0]] -= Yval_diag
-            print('3' + str(nodes), flush=True)
             self.Ybus[nodes[1]][nodes[1]] -= Yval_diag
-            print('4' + str(nodes), flush=True)
 
             if nodes[0] not in YbusChanges:
-              print('5' + str(nodes), flush=True)
               YbusChanges[nodes[0]] = {}
-              print('6' + str(nodes), flush=True)
             if nodes[1] not in YbusChanges:
-              print('7' + str(nodes), flush=True)
               YbusChanges[nodes[1]] = {}
-              print('8' + str(nodes), flush=True)
             YbusChanges[nodes[0]][nodes[1]] = YbusChanges[nodes[1]][nodes[0]] = switchOpenValue
-            print('9' + str(nodes), flush=True)
 
             YbusChanges[nodes[0]][nodes[0]] = self.Ybus[nodes[0]][nodes[0]]
-            print('0' + str(nodes), flush=True)
             YbusChanges[nodes[1]][nodes[1]] = self.Ybus[nodes[1]][nodes[1]]
-            print('01' + str(nodes), flush=True)
 
         else: # closed
           if not self.checkSwitchClosed(nodes):
