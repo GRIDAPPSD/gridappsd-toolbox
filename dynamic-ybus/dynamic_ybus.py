@@ -229,7 +229,7 @@ class SimWrapper(object):
         nodes = self.TransformerMridToNodes[mrid]
         node1 = nodes[0]
         node2 = nodes[1]
-        #print('Found transformer mrid: ' + mrid + ', node: ' + noderow + ', value: ' + str(value), flush=True)
+        #print('Found transformer mrid: ' + mrid + ', node1: ' + node1 + ', node2: ' + node2 + ', value: ' + str(value), flush=True)
         if value != self.TransformerLastPos[nodes[1]]:
           print('Transformer value changed for node: ' + node2 + ', old value: ' + str(self.TransformerLastPos[node2]) + ', new value: ' + str(value), flush=True)
           # calculate the admittance multiplier based on the change in the tap
@@ -315,6 +315,7 @@ class SimWrapper(object):
       msgdict = message['message']
       self.timestamp = msgdict['timestamp']
       print('Processing simulation timestamp: ' + str(self.timestamp), flush=True)
+      #print('Simulation message: ' + str(msgdict), flush=True)
 
       # Question: Andy mentioned creating a separate Ybus for each feeder and
       #   island.  Right now I have only a monolithic Ybus so need to come
