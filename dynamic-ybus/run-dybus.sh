@@ -16,7 +16,8 @@ if [[ -z "$SIMREQ" ]]; then
         exit
     fi
 
-    read -d "\n" SIMID SIMREQ <<< $(../sim_starter/sim_starter.py $1)
+    #read -d "\n" SIMID SIMREQ <<< $(../sim_starter/sim_starter.py $1)
+    read -d "\n" SIMID SIMREQ <<< $(../sim_starter/sim-starter.py $1)
 else
 #   invocation when simulation is already started from platform viz
     SIMID=$1
